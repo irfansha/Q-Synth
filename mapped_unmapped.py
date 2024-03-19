@@ -42,7 +42,7 @@ class MappedUnmappedCircuit:
     original = self.track_ancillary[pqubit]
     self.reverse_init_mapping[original] = lqubit 
     del self.track_ancillary[pqubit]
-    if self.debug > 2:
+    if self.verbose > 2:
       print(f"...initially mapping l{lqubit} to p{original} (now p{pqubit})")
 
   # helper function: swap (l1,p1) to (l2,p2)
@@ -50,7 +50,7 @@ class MappedUnmappedCircuit:
     if lqubit2 == None: # 
       self.track_ancillary[pqubit1] = self.track_ancillary[pqubit2]
       del self.track_ancillary[pqubit2]
-      if self.debug > 2:
+      if self.verbose > 2:
         print(f"...ancillary p{pqubit1} came from p{self.track_ancillary[pqubit1]}")
     if lqubit1!=None:
       self.logical_physical_map[lqubit1] = pqubit2
@@ -59,11 +59,17 @@ class MappedUnmappedCircuit:
   # One of the logical qubits may be None (ancillary swap)
   def apply_swap(self, lqubit1, lqubit2, pqubit1, pqubit2):
     self.number_of_swaps += 1
-    if self.debug > 2:
+    if self.verbose > 2:
       print(f"Apply swap #{self.number_of_swaps} to "
             f"(p{pqubit1}, p{pqubit2}), corresponding to (l{lqubit1}, l{lqubit2})")
+
     # we add a swap gate to the circuit:
-    self.mapped_circuit.swap(pqubit1, pqubit2)
+    if [pqubit1, pqubit2] in self.coupling_map or [pqubit2, pqubit1] in self.coupling_map:
+        self.mapped_circuit.swap(pqubit1, pqubit2)
+    else:
+        print("Error: try to SWAP non-connected qubits")
+        exit(-1)
+
     # currently, we don not handle a swap on two ancillary qubits
     assert not (lqubit1 == None and lqubit2 == None)
     self.swap_half(lqubit1, lqubit2, pqubit1, pqubit2)
@@ -78,13 +84,13 @@ class MappedUnmappedCircuit:
       gate = gates.pop(0) # this removes gates[0] also from self.unary_gates[lqubit]
       newgate = gate_set_qubit(self.lcircuit[gate], pqubit, self.num_pqubits)
       self.mapped_circuit.append(newgate)
-      if self.debug > 2:
+      if self.verbose > 2:
         print(f"...applying unary gate #{gate_idx} ({newgate.operation.name}) to l{lqubit} on p{pqubit}")
 
   # apply CNOT with gate_idx to the logical/physical qubits
   # also apply all unary gates until this index on these qubits
   def apply_cnot(self, lqubit1, lqubit2, pqubit1, pqubit2, gate_idx):
-    if self.debug > 2:
+    if self.verbose > 2:
       print(f"Apply CNOT #{gate_idx} to "
             f"(l{lqubit1}, l{lqubit2}), mapped to (p{pqubit1}, p{pqubit2})")
 
@@ -100,13 +106,77 @@ class MappedUnmappedCircuit:
     self.apply_unary_gates(lqubit2, pqubit2, gate_idx)
 
     # we add the cnot gate to the circuit
-    self.mapped_circuit.cx(pqubit1,pqubit2)
+    if [pqubit1, pqubit2] in self.coupling_map:
+      self.mapped_circuit.cx(pqubit1, pqubit2)
+    elif [pqubit2, pqubit1] in self.coupling_map:
+      if self.args.bidirectional == 1:
+        self.mapped_circuit.cx(pqubit1, pqubit2)
+      elif self.args.bidirectional == 2: # Use H-swap-H
+        self.mapped_circuit.h(pqubit1)
+        self.mapped_circuit.h(pqubit2)
+        self.mapped_circuit.cx(pqubit2, pqubit1)
+        self.mapped_circuit.h(pqubit1)
+        self.mapped_circuit.h(pqubit2)
+        self.number_of_h += 4
+        if (self.verbose > 2):
+          print("...applied H-CNOT-H gates")
+      else:
+        print("Error: tried to connect CNOT gate in opposite direction")
+        exit(-1)
+    else:
+        print("Error: tried to CNOT gate non-connected qubits")
+        print(pqubit1, pqubit2, self.coupling_map)
+        exit(-1)
+
+  def apply_bridge(self, lqubit1, lqubit2, pqubit1, pqubit2, pqubit3, gate_idx):
+    self.number_bridges += 1
+    if self.verbose > 2:
+      print(f"Apply Bridge for CNOT #{gate_idx} on (l{lqubit1}, l{lqubit2})")
+      print(f"..CNOT p{pqubit1}, p{pqubit2}")
+      print(f"..CNOT p{pqubit2}, p{pqubit3}")
+      print(f"..CNOT p{pqubit1}, p{pqubit2}")
+      print(f"..CNOT p{pqubit2}, p{pqubit3}")
+
+    # For now, assuming that the logical qubits have been mapped already
+    assert self.logical_physical_map[lqubit1] == pqubit1
+    assert self.logical_physical_map[lqubit2] == pqubit3
+
+    # we apply the unary gates before this cnot
+    self.apply_unary_gates(lqubit1, pqubit1, gate_idx)
+    self.apply_unary_gates(lqubit2, pqubit3, gate_idx)
+
+    # we add the cnot gate to the circuit
+    p12OK = [pqubit1, pqubit2] in self.coupling_map or (self.args.bidirectional==1 and [pqubit2, pqubit1] in self.coupling_map)
+    p23OK = [pqubit2, pqubit3] in self.coupling_map or (self.args.bidirectional==1 and [pqubit3, pqubit2] in self.coupling_map)
+    if p12OK and p23OK:
+      self.mapped_circuit.cx(pqubit1, pqubit2)
+      self.mapped_circuit.cx(pqubit2, pqubit3)
+      self.mapped_circuit.cx(pqubit1, pqubit2)
+      self.mapped_circuit.cx(pqubit2, pqubit3)
+    else:
+        print("Error: tried to BRIDGE through non-connected qubits")
+        print(f"{pqubit1}-{pqubit2}-{pqubit3} is not a bridge in {self.coupling_map} (bidirectional={self.args.bidirectional})")
+        exit(-1)
+
+
+  # 
+  def find_free_pqubit(self, lqubit):
+    for pqubit in range(self.num_pqubits):
+      if pqubit not in self.logical_physical_map.values():
+        self.map_initial(lqubit, pqubit)
+        return pqubit
+    assert False # no free physical qubit found
 
   # Finish the mapped circuit and return it
   def get_mapped_circuit(self):
     max_gate_idx = len(self.lcircuit) + 1
     for lqubit in range(self.num_lqubits):
-      pqubit = self.logical_physical_map[lqubit]
+      if lqubit in self.logical_physical_map:
+        pqubit = self.logical_physical_map[lqubit]
+      else:
+        pqubit = self.find_free_pqubit(lqubit)
+        if self.verbose > 2:
+          print(f"......mapped dangling l{lqubit} onto p{pqubit}")
       self.apply_unary_gates(lqubit, pqubit, max_gate_idx)
     return self.mapped_circuit
 
@@ -158,13 +228,16 @@ class MappedUnmappedCircuit:
                 unmapped_circuit.append(newgate)
         return unmapped_circuit
   
-  def __init__(self, args, logical_circuit, num_physical_qubits):
+  def __init__(self, args, logical_circuit, num_physical_qubits, coupling_map):
 
+    self.args = args
     self.lcircuit = logical_circuit
     self.num_pqubits = num_physical_qubits
     self.num_lqubits = len(self.lcircuit.qubits)
     self.number_of_swaps = 0
-    self.debug = args.verbose
-
+    self.number_bridges = 0
+    self.number_of_h = 0
+    self.verbose = args.verbose
+    self.coupling_map = coupling_map
     self.init_data_structures()
 

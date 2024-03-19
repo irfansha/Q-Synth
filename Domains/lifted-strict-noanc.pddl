@@ -23,7 +23,7 @@
 
     ; physical qubits ?p1 and ?p2 are connected;
     ; static predicate
-    (neighbour ?p1 ?p2 - pbit)                 
+    (connected ?p1 ?p2 - pbit)                 
 
     ; gate ?g0 on logical qubits ?l1 and ?l2 depends on gates ?g1 and ?g2
     ; static predicate
@@ -38,7 +38,7 @@
     :parameters (?l1 ?l2 - lbit ?p1 ?p2 - pbit ?g0 ?g1 ?g2 - gate)
     :precondition (and
         (cnot ?l1 ?l2 ?g0 ?g1 ?g2)
-        (neighbour ?p1 ?p2)
+        (connected ?p1 ?p2)
         (mapped ?l1 ?p1) (mapped ?l2 ?p2)
         (done ?g1) (done ?g2) (not (done ?g0))
     )
@@ -51,7 +51,7 @@
     :parameters (?l1 ?l2 - lbit ?p1 ?p2 - pbit ?g0 - gate)
     :precondition (and
         (cnot ?l1 ?l2 ?g0 ?l1 ?l2)
-        (neighbour ?p1 ?p2)
+        (connected ?p1 ?p2)
         (not (occupied ?p1)) (not (occupied ?p2))
         (not (done ?g0))
     )
@@ -66,7 +66,7 @@
     :parameters (?l1 ?l2 - lbit ?p1 ?p2 - pbit ?g0 ?g2 - gate)
     :precondition (and
         (cnot ?l1 ?l2 ?g0 ?l1 ?g2)
-        (neighbour ?p1 ?p2)
+        (connected ?p1 ?p2)
         (mapped ?l2 ?p2)
         (not (occupied ?p1))
         (done ?g2) (not (done ?g0))
@@ -81,7 +81,7 @@
     :parameters (?l1 ?l2 - lbit ?p1 ?p2 - pbit ?g0 ?g1 - gate)
     :precondition (and
         (cnot ?l1 ?l2 ?g0 ?g1 ?l2)
-        (neighbour ?p1 ?p2)
+        (connected ?p1 ?p2)
         (mapped ?l1 ?p1)
         (not (occupied ?p2))
         (done ?g1) (not (done ?g0))
@@ -95,7 +95,7 @@
 (:action swap
     :parameters (?l1 ?l2 - lbit ?p1 ?p2 - pbit)
     :precondition (and 
-        (neighbour ?p1 ?p2)
+        (connected ?p1 ?p2)
         (mapped ?l1 ?p1) (mapped ?l2 ?p2)
     )
     :effect (and 

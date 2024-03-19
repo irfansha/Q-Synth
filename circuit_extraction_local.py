@@ -27,23 +27,31 @@ class CircuitExtractionLocal:
         p1 = int(step[1][1:])
         p2 = int(step[2][1:])
         self.map_unmap.apply_cnot(l1,l2,p1,p2,gate_index)
+      elif step[0]=="map_initial":
+        l1 = int(step[1][1:])
+        p1 = int(step[2][1:])
+        self.map_unmap.map_initial(l1, p1)
+      else:
+        print(f"Unexpected error: action {step[0]} in plan not understood")
+        exit(-1)
 
   # uses the plan for extracting mapped circuit:
   def __init__(self, args,pddl_instance, plan):
 
-    assert "local" in args.model
+    assert("local" in args.model or "sat" in args.model)
 
     self.circuit = pddl_instance.logical_circuit
 
-    self.map_unmap = MappedUnmappedCircuit(args, self.circuit, pddl_instance.num_physical_qubits)
+    self.map_unmap = MappedUnmappedCircuit(args, self.circuit, pddl_instance.num_physical_qubits, pddl_instance.coupling_map)
+
+    # adding initial map for sat encoding separately:
+    if (args.model == "sat"):
+        for lqubit, pqubit in pddl_instance.logical_physical_map.items():
+          self.map_unmap.map_initial(lqubit,pqubit)
 
     self.extract(plan)
     mapped_circuit = self.map_unmap.get_mapped_circuit()
     mapped_circuit = self.map_unmap.get_measured_circuit()
-
-    # writing circuit out if specified:
-    if (args.circuit_out != None):
-      QuantumCircuit.qasm(mapped_circuit,filename=args.circuit_out)
 
     if (args.verbose > 0):
       if (args.verbose > 2):
@@ -51,4 +59,6 @@ class CircuitExtractionLocal:
       print("mapped circuit:")
       print(mapped_circuit)
 
-    print("Number of additional swaps:", self.map_unmap.number_of_swaps)
+    # we print this even in silent mode, since this is the main result
+    report_h = f"({self.map_unmap.number_of_h} extra H-gates)" if self.map_unmap.number_of_h > 0 else ""
+    print("Number of additional swaps:", self.map_unmap.number_of_swaps, report_h)

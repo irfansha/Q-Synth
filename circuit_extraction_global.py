@@ -1,137 +1,93 @@
 # (C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023
 
 from qiskit import QuantumCircuit
-
+from mapped_unmapped import MappedUnmappedCircuit
+from circuit_utils import gate_get_qubit
 class CircuitExtractionGlobal:
 
-  def extract(self,args,pddl_instance, plan):
-
-    # parsing plan and generate a dict with time steps:
-    plan_time_dict = {}
-    # we update the logical and physical qubit mapping:
-    self.logical_physical_map = {}
-    self.measurement_copy = {}
-    self.reverse_init_mapping = {}
-
-    # first depth label for discrete/global model:
-    if (args.model == "global"):
-      cur_depth =  "d0"
-    for step in plan:
-      if ("map_initial" == step[0]):
-        self.logical_physical_map[step[1]] = step[2]
-        self.measurement_copy[step[1]] = step[2]
-        self.reverse_init_mapping[step[2]] = step[1]
-      elif ("move_depth" in step[0]):
-        cur_depth = step[2]
-        #print(step)
-      elif ("apply_cnot" == step[0]):
-        # we only need to remember the physical qubits the cnot/swap is applied:
-        if (step[-1] not in plan_time_dict):
-          plan_time_dict[step[-1]] = [step[:-1]]
-        else:
-          plan_time_dict[step[-1]].append(step[:-1])
-      elif ("swap" in step[0]):
-        if (args.model == "global"):
-          if (cur_depth not in plan_time_dict):
-            plan_time_dict[cur_depth] = [step]
-          else:
-            plan_time_dict[cur_depth].append(step)
-        else:
-          if (step[-1] not in plan_time_dict):
-            plan_time_dict[step[-1]] = [step[:-1]]
-          else:
-            plan_time_dict[step[-1]].append(step[:-1])
-
-
-    #print(plan_time_dict)
-    # we maintain the current physical mapping of logical qubits, at each layer:
-    
-    # we add circuit layer by layer:
-    self.mapped_circuit = []
-
-    for i,layer in enumerate(pddl_instance.input_dag.layers()):
+  # retrieve the gate names from the logical circuit
+  def construct_gate_idx_map(self, args, pddl_instance):
+    self.gateidx = dict()
+    circuit = pddl_instance.logical_circuit
+    gates_used = set()
+    for d, layer in enumerate(pddl_instance.input_dag.layers()):
       subdag = layer['graph']
-      # differentiating layers that are in the plan dict and that are not:
-      layer_index =  "d" + str(i + 1)
-      if (layer_index not in plan_time_dict):
-        for node in subdag.op_nodes():
-          #print(node.name, node.op.num_qubits, node.qargs, node.cargs)
-          # we know there are no 2 bits operators or more here:
-          if node.op.num_qubits != 1:
-            print(f"Error: can only handle unary gates and CX gates. Found {node.name} on {node.op.num_qubits} qubits")
+      for node in subdag.op_nodes():
+        if node.op.name == 'cx':
+          l1 = node.qargs[0].index
+          l2 = node.qargs[1].index
+          # search for this gate in the circuit, but not in gates_used
+          idx = -1
+          for i in range(0,len(circuit)):
+            if (i not in gates_used and circuit[i].operation.name == 'cx' and
+                gate_get_qubit(circuit[i], 0) == l1 and gate_get_qubit(circuit[i], 1) == l2):
+              idx = i
+              break # found the gate at idx
+          if idx == -1:
+            print(f"Error: Node {node} not found")
             exit(-1)
-          if len(node.op.params) != 0:
-            assert(len(node.op.params) == 1)
-            self.mapped_circuit.append(node.name + "(" +str(node.op.params[0]) + ") q[" + str(self.logical_physical_map["l" + str(node.qargs[0].index)][1:]) + "];") 
-          else:
-            # using logical map for finding the right physical qubit after probable swapping:
-            self.mapped_circuit.append(node.name + " q[" + str(self.logical_physical_map["l" + str(node.qargs[0].index)][1:]) + "];")
+          gates_used.add(idx) # this CX gate should not be found again
+          if args.verbose > 2:
+            print(f"Identified CX-gate at depth ({l1},{l2},{d+1}) -> {idx}")
+          self.gateidx[(l1,l2,d+1)] = idx
+
+  def identify_first_depth(self,plan):
+    cur_depth = -1
+    for step in plan:
+      if step[0] == "apply_cnot":
+        cur_depth = step[5]
+        break    
+    if cur_depth == -1:
+      print("Error: Initial depth could not be identified from the plan")
+      exit(-1)
+    self.cur_depth = int(cur_depth[1:])
+
+  def extract(self, plan):
+    # Translate plan into physical circuit
+    for step in plan:
+      if "map_initial" == step[0]:
+        logical = int(step[1][1:])
+        physical = int(step[2][1:])
+        self.map_unmap.map_initial(logical, physical)
+      elif "move_depth" == step[0]:
+        self.cur_depth = int(step[2][1:])
+      elif "apply_cnot" == step[0]:
+        # we only need to remember the physical qubits the cnot/swap is applied:
+        (_, l1, l2, p1 ,p2, _) = step
+        l1, l2, p1, p2 = int(l1[1:]), int(l2[1:]), int(p1[1:]), int(p2[1:])
+        gate = self.gateidx[(l1, l2, self.cur_depth)]
+        self.map_unmap.apply_cnot(l1, l2, p1, p2, gate)
       else:
-        for node in subdag.op_nodes():
-          # single bit operators are not touched, even with swapping:
-          if (node.op.num_qubits == 1):
-            if (len(node.op.params) != 0):
-              assert(len(node.op.params) == 1)
-              self.mapped_circuit.append(node.name + "(" +str(node.op.params[0]) + ") q[" + str(self.logical_physical_map["l" + str(node.qargs[0].index)][1:]) + "];") 
-            else:
-              # using logical map for finding the right physical qubit after probable swapping:
-              self.mapped_circuit.append(node.name + " q[" + str(self.logical_physical_map["l" + str(node.qargs[0].index)][1:]) + "];")
-        # now we handle all the plan actions within step that covers all the 2 qubit operators:
-        for plan_action in plan_time_dict[layer_index]:
-          # for swap, we swap the qubits:
-          if ("swap_ancillary" == plan_action[0]):
-            # we increment the number of swaps:
-            self.number_of_swaps += 1
-            #print(self.logical_physical_map, plan_action)
-            # first logical qubit is mapped to 2nd physical qubit:
-            self.logical_physical_map[plan_action[1]] = plan_action[3]
-            # connecting the physical qubits:
-            self.mapped_circuit.append("swap q[" + str(plan_action[2][1:]) + "],q[" + str(plan_action[3][1:]) +"];")
-            #print(self.logical_physical_map)
-          elif ("swap" == plan_action[0]):
-            # we increment the number of swaps:
-            self.number_of_swaps += 1
-            #print(self.logical_physical_map, plan_action)
-            # first logical qubit is mapped to 2nd physical qubit:
-            self.logical_physical_map[plan_action[1]] = plan_action[4]
-            # second logical qubit is mapped to 1st physical qubit:
-            self.logical_physical_map[plan_action[2]] = plan_action[3]
-            # connecting the physical qubits:
-            self.mapped_circuit.append("swap q[" + str(plan_action[3][1:]) + "],q[" + str(plan_action[4][1:]) +"];")
-          elif("apply_cnot" == plan_action[0]):
-            self.mapped_circuit.append("cx q[" + str(plan_action[3][1:]) + "],q[" + str(plan_action[4][1:]) +"];")
-
-
-  def mapped_circuit_to_string(self, pddl_instance):
-
-    self.mapped_circuit_string = "OPENQASM 2.0;\ninclude \"qelib1.inc\";\n"
-    self.mapped_circuit_string += "qreg q[" + str(pddl_instance.num_physical_qubits) +"];\n"
-    # for measurement if needed:
-    self.mapped_circuit_string += "creg c[" + str(pddl_instance.num_physical_qubits) +"];\n"
-
-    for instruction in self.mapped_circuit:
-      self.mapped_circuit_string += instruction + "\n"
-
-    # adding barrier:
-    self.mapped_circuit_string += "\nbarrier q;\n"
-
-    for lqubit,pqubit in self.logical_physical_map.items():
-      self.mapped_circuit_string += "measure q["+ pqubit[1:] + "] -> c["+ lqubit[1:] +"];\n"
+        assert "swap" in step[0]
+        l1 = None
+        l2 = None
+        if step[0] == "swap":
+          (_,l1,l2,p1,p2) = step
+          l1, l2, p1, p2 = int(l1[1:]), int(l2[1:]), int(p1[1:]), int(p2[1:])
+        elif step[0] == "swap_ancillary1":
+          (_,l1,p1,p2,) = step
+          l1, p1, p2 = int(l1[1:]), int(p1[1:]), int(p2[1:])
+        elif step[0] == "swap_ancillary2":
+          (_,l2,p1,p2,) = step
+          l2, p1, p2 = int(l2[1:]), int(p1[1:]), int(p2[1:])
+        self.map_unmap.apply_swap(l1, l2, p1, p2)
 
   # uses the plan for extracting mapped circuit:
-  def __init__(self, args,pddl_instance, plan):
+  def __init__(self, args, pddl_instance, plan):
 
-    self.number_of_swaps = 0
-
-    self.extract(args,pddl_instance,plan)
-    self.mapped_circuit_to_string(pddl_instance)
-    mapped_circuit = QuantumCircuit.from_qasm_str(self.mapped_circuit_string)
-
-    # writing circuit out if specified:
-    if (args.circuit_out != None):
-      QuantumCircuit.qasm(mapped_circuit,filename=args.circuit_out)
-
-    #print(self.mapped_circuit_string)
+    self.construct_gate_idx_map(args, pddl_instance)
+    self.identify_first_depth(plan)
+    self.map_unmap = MappedUnmappedCircuit(args, pddl_instance.logical_circuit, pddl_instance.num_physical_qubits, pddl_instance.coupling_map)
+    self.extract(plan)
+    mapped_circuit = self.map_unmap.get_mapped_circuit()
+    mapped_circuit = self.map_unmap.get_measured_circuit()
+    
     if (args.verbose > 0):
+      if (args.verbose > 2):
+        print(QuantumCircuit.qasm(self.map_unmap.mapped_circuit))
+      print("mapped circuit:")
       print(mapped_circuit)
-    print("Number of additional swaps: ", self.number_of_swaps)
+
+    # we print this even in silent mode, since this is the main result
+    report_h = f"({self.map_unmap.number_of_h} extra H-gates)" if self.map_unmap.number_of_h > 0 else ""
+    print("Number of additional swaps:", self.map_unmap.number_of_swaps, report_h)

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-Path_to_benchmarks="../Benchmarks/"
+Path_to_benchmarks="../../Benchmarks/Planning/"
 
 declare -a Model_Solver_combinations=(
            "local fd-bjolp"
@@ -19,6 +19,6 @@ for model_solver_combination in "${Model_Solver_combinations[@]}"; do
   echo "======================================================================================================================="
   for file in ${Melbourne_instances}; do
     echo -e "\nCircuit: "$file
-    ../q-synth.py -a$ancillary -b1 -p melbourne -m ${mscomb[0]} -s ${mscomb[1]} --run 2 -t 1800 -v1 $Path_to_benchmarks$file
+    ../../q-synth.py -a$ancillary -b1 -p melbourne -m ${mscomb[0]} -s ${mscomb[1]} --run 2 -t 1800 -v1 $Path_to_benchmarks$file
   done
 done

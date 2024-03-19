@@ -6,7 +6,6 @@
 (define (domain Quantum)
 (:requirements :typing :negative-preconditions)
 (:types pqubit lqubit depth)
-(:constants d0 - depth)
 (:predicates (occupied_pqubit ?p - pqubit)
              (occupied_lqubit ?l - lqubit)
              (mapped ?l - lqubit ?p - pqubit)
@@ -23,7 +22,7 @@
 
 (:action map_initial
 :parameters (?l - lqubit ?p - pqubit)
-:precondition (and (not (occupied_lqubit ?l)) (not (occupied_pqubit ?p))) ; (current_depth d0))
+:precondition (and (not (occupied_lqubit ?l)) (not (occupied_pqubit ?p)))
 :effect       (and (occupied_lqubit ?l) (occupied_pqubit ?p) (mapped ?l ?p))
 )
 
@@ -32,19 +31,24 @@
 
 (:action swap
 :parameters (?l1 ?l2 - lqubit ?p1 ?p2 - pqubit)
-:precondition (and (mapped ?l1 ?p1) (mapped ?l2 ?p2) (connected ?p1 ?p2)); (not (current_depth d0)))
+:precondition (and (mapped ?l1 ?p1) (mapped ?l2 ?p2) (connected ?p1 ?p2))
 :effect       (and (not (mapped ?l1 ?p1)) (not (mapped ?l2 ?p2)) (mapped ?l1 ?p2) (mapped ?l2 ?p1))
 )
 
 ;; we can swap with ancillary qubits:
 ;; we update if qubits are initialized and occupied
 
-(:action swap_ancillary
+(:action swap_ancillary1
 :parameters (?l1 - lqubit ?p1 ?p2 - pqubit)
-:precondition (and (mapped ?l1 ?p1) (not (occupied_pqubit ?p2)) (connected ?p1 ?p2)); (not (current_depth d0)))
+:precondition (and (mapped ?l1 ?p1) (not (occupied_pqubit ?p2)) (connected ?p1 ?p2))
 :effect       (and (not (mapped ?l1 ?p1)) (mapped ?l1 ?p2) (not (occupied_pqubit ?p1)) (occupied_pqubit ?p2))
 )
 
+(:action swap_ancillary2
+:parameters (?l2 - lqubit ?p1 ?p2 - pqubit)
+:precondition (and (mapped ?l2 ?p2) (not (occupied_pqubit ?p1)) (connected ?p1 ?p2))
+:effect       (and (not (mapped ?l2 ?p2)) (mapped ?l2 ?p1) (not (occupied_pqubit ?p2)) (occupied_pqubit ?p1))
+)
 
 ;; After (full/partial) swapping, we need to apply cnot gates
 ;; only when the physical qubits to which the logical qubits are connected, we can apply the cnot gate in that time step

@@ -10,10 +10,24 @@ class RunPlanner:
     # Local models use a generated domain file
     if (self.args.model == "global"):
       domain = os.path.join(self.args.domains, "global-domain")
-    elif self.args.model == "lifted_initial":
-      domain = os.path.join(self.args.domains, "lifted-initial-strict")
     elif self.args.model == "lifted":
-      domain = os.path.join(self.args.domains, "lifted-strict")
+      if self.args.initial == 1:
+        if self.args.relaxed == 1:
+          print("Error: --relaxed=1 and --initial==1 is not implemented for lifted")
+          exit(-1)
+        else:
+          if self.args.bridge == 0:
+            domain = os.path.join(self.args.domains, "lifted-initial-strict")
+          else:
+            domain = os.path.join(self.args.domains, "lifted-initial-strict-bridge")
+      else: # integrated initial mapping
+        domain = os.path.join(self.args.domains, "lifted")
+        if (self.args.relaxed == 1):
+          domain += "-relaxed"
+        else:
+          domain += "-strict"
+          if self.args.bridge == 1:
+            domain += "-bridge"
     elif "local" in self.args.model:
       return self.args.pddl_domain_out # NOTE: here we return directly, independent of ancillary
     else:
@@ -48,7 +62,7 @@ class RunPlanner:
        exit(-1)
     command = "fast-downward.py "+ planner_options +" --log-level warning --plan-file " + self.args.plan_file + " --sas-file " + self.args.SAS_file + "  --overall-time-limit "+ str(int(self.args.time)) +"s " +  domain + " " + self.args.pddl_problem_out +" > " + self.args.log_out
     if self.args.verbose > -1:
-      print(command)
+      print(command, flush=True)
     os.system(command)
 
   def run_madagascar(self):
@@ -88,6 +102,37 @@ class RunPlanner:
           break
         else:
           plan_length += 1
+
+  def run_lisat(self):
+    # TODO: preprocessor to eliminate negative conditions
+    # TODO: check for LISAT executable
+    command = "lisat.sif -d " + self.args.pddl_domain_out + " -i " + self.args.pddl_problem_out + " -s sat -o > " + self.args.log_out
+    print(command)
+    os.system(command)
+
+
+  def parse_lisat(self):
+    try:
+      f = open("sas_plan","r")
+      lines = f.readlines()
+      f.close()
+    except FileNotFoundError:
+      print(f"No plan could be found. So {self.args.circuit_in} could not be mapped on {self.args.platform}")
+      exit(-1)
+
+    self.plan = []
+    for line in lines:
+      print(line)
+      line_list = line.split(" ")[1:-1]
+      print(line_list)
+      action_name = line_list[0].strip("()")
+      parameters = line_list[1:]
+      new_action_list = []
+      new_action_list.append(action_name)
+      new_action_list.extend(parameters)
+      self.plan.append(new_action_list)
+      #print(new_action_list)
+
 
   def parse_fdplan(self):
     try:
@@ -157,6 +202,9 @@ class RunPlanner:
     elif("M-seq-optimal" == self.args.solver):
       self.run_madagascar_optimal()
       self.parse_Mplan()
+    elif("LiSAT" == self.args.solver):
+      self.run_lisat()
+      self.parse_lisat()    
     else:
       if self.args.solver not in ("M-seq", "MpC"):
         print(f"Error: solver {self.args.solver} is not understood")
