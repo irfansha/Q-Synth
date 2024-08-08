@@ -1,0 +1,17 @@
+- Add Cnot Synthesis as part of Peephole Optimization
+
+- Compare Clifford Simplication in tket with our Peephole optimization
+
+- Double Excitation Operator CNOT reduction
+  - Replace tket clifford simplication with our optimziation to compute CNOT minimization
+  - Perhaps using permutations can result in 12 CNOTs (may be not)
+
+
+
+Other approaches that do layout aware synthesis (read and consider for comparision):
+- Optimization of CNOT circuits on limited-connectivity architecture (same as layout aware swapple)
+  https://arxiv.org/abs/1910.14478
+- Not All SWAPs Have the Same Cost: A Case for Optimization-Aware Qubit Routing:
+  https://hzhou.wordpress.ncsu.edu/files/2022/12/HPCA22_NASSC.pdf
+- Towards Optimal Topology Aware Quantum Circuit Synthesis:
+  https://marcdav.is/static/fileshare/Towards_Optimal_Topology_Aware_Quantum_Circuit_Synthesis.pdf
