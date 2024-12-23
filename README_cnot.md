@@ -117,34 +117,35 @@ The solution is translated back to reconstruct the corresponding optimal CNOT su
 
 ### Positional argument:
 
-    INPUT.qasm            input circuit file
-    OUTPUT.qasm           output circuit file: None (d)
+    INPUT.qasm               input circuit file
+    OUTPUT.qasm              output circuit file: None (d)
 
 ### Choosing synthesis combination:
 
-    -q, --qubit_permute   Allow any permutation of qubits in CNOT subcircuits
-    -p, --platform        Quantum platform: tenerife, melbourne (d), tokyo and others
+    -q, --qubit_permute      Allow any permutation of qubits in CNOT subcircuits
+    -p, --platform           Quantum platform: tenerife, melbourne (d), tokyo and others
 
 ### Choosing solving technique and solvers:
 
-    -m , --model          Encoding to use: planning, sat, qbf
-    -s, --solver          Solvers to use :
-                            for planning : fd-ms, lama
-                            for sat      : cadical
-                            for qbf      : caqe
+    -m , --model             Encoding to use: planning, sat, qbf
+    -s, --solver             Solvers to use :
+                               for planning : fd-ms, lama
+                               for sat      : cadical
+                               for qbf      : caqe
 
 ### Optimization metric:
 
-    --minimize            Minimization metric for CNOT synthesis:
-                            gates = minimizing number of gates (default)
-                            depth = depth minimization (only for qbf and sat solvers)
+    --minimize               Minimization metric for CNOT synthesis:
+                               gates = minimizing number of gates (default)
+                               depth = depth minimization (only for qbf and sat solvers)
 
 ### Other options:
-    -t, --time            Solving time limit for each CNOT slicein seconds: 600 (d)
-    -v, --verbose         Verbosity [-1/0/1/2]: 
-                            0=status (d), 1=visual, 2=extended, -1=silent
-    -h, --help            Help with detailed description of all options
-    --aux_files           location for intermediate files: ./intermediate_files (d)
+    -t, --time               Solving time limit for each CNOT slicein seconds: 600 (d)
+    -v, --verbose            Verbosity [-1/0/1/2]: 
+                               0=status (d), 1=visual, 2=extended, -1=silent
+    -h, --help               Help with detailed description of all options
+    --aux_files              location for intermediate files: ./intermediate_files (d)
+    --only_write_pddl_files  Only write PDDL instance files instead of running the planner (for Classical Planning)
 
 
 ### Debug option

@@ -20,7 +20,8 @@ import time as clock
 
 def peephole_cnotsynthesis(circuit_in=None, circuit_out=None, minimize="gates", model="sat", qubit_permute=None,
                            solver=None, time=600, platform=None, bidirectional=1,
-                           intermediate_files_path="./intermediate_files", verbose=0, check_equivalence=0):
+                           intermediate_files_path="./intermediate_files", verbose=0, check_equivalence=0,
+                           only_write_pddl_files=False):
 
   # TODO: add descriptions of arguments:
   # --------------------------------------- Creating args separately ---------------------------------------
@@ -37,6 +38,7 @@ def peephole_cnotsynthesis(circuit_in=None, circuit_out=None, minimize="gates", 
     args.platform = platform
     args.bidirectional = bidirectional
     args.check_equivalence = check_equivalence
+    args.only_write_pddl_files = only_write_pddl_files
   # ----------------------------------------------------------------------------------------------------
     # find Benchmarks and Domains,
     peephole_cnotsynthesis_path = os.path.abspath(__file__)
@@ -97,6 +99,9 @@ def peephole_cnotsynthesis(circuit_in=None, circuit_out=None, minimize="gates", 
 
     opt_circuit = QuantumCircuit(num_qubits)
 
+    circuit_name = os.path.basename(args.circuit_in)
+    slice_number = 1
+
     total_slices = len(sliced_circuit.slices)
     for slice_id in range(total_slices):
       slice = sliced_circuit.slices[slice_id]
@@ -108,8 +113,12 @@ def peephole_cnotsynthesis(circuit_in=None, circuit_out=None, minimize="gates", 
       if num_cx_gates < 1: cur_opt_circuit = None
       else:
         if (args.planner != None):
-           cur_opt_circuit = cnot_op(slice.optimization_slice, planner=args.planner, time=args.time,
-                                      minimization=args.minimize, verbose=args.verbose, coupling_graph=coupling_graph)
+          cur_opt_circuit = cnot_op(slice.optimization_slice, planner=args.planner, time=args.time,
+                                    minimization=args.minimize, verbose=args.verbose, coupling_graph=coupling_graph,
+                                    only_write_pddl_files=args.only_write_pddl_files, pddl_dir_name=circuit_name, slice_number=slice_number)
+          slice_number += 1
+          if (args.only_write_pddl_files):
+            continue
         elif (args.qbf_solver != None or args.sat_solver != None):
           if (args.qbf_solver != None):
             solver = args.qbf_solver

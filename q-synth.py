@@ -157,6 +157,7 @@ if __name__ == '__main__':
                                '''), default=None)
   cnot_parser.add_argument("-b", "--bidirectional", type=int, help="Make coupling bidirectional [0/1]: 0=no, 1=yes (default)" ,default = 1)
   cnot_parser.add_argument("--check_equivalence", type=int, help="Check equivalence using qcec [0/1]: 0=no (default), 1=yes (*)" ,default = 0)
+  cnot_parser.add_argument("--only_write_pddl_files", help="Only generate PDDL instance files instead of executing the planner", action="store_true")
 
   args = parser.parse_args()
 
@@ -196,4 +197,5 @@ if __name__ == '__main__':
     peephole_cnotsynthesis(circuit_in=args.circuit_in, circuit_out=args.circuit_out, minimize=args.minimize,
                            model=args.model, qubit_permute=args.qubit_permute,
                            solver=args.solver, time=args.time, platform=args.platform, bidirectional=args.bidirectional,
-                           intermediate_files_path=args.aux_files, verbose=args.verbose, check_equivalence=args.check_equivalence)
+                           intermediate_files_path=args.aux_files, verbose=args.verbose, check_equivalence=args.check_equivalence,
+                           only_write_pddl_files=args.only_write_pddl_files)
