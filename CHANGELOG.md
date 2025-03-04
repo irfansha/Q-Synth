@@ -1,3 +1,8 @@
+# Features in Q-Synth v4.0 (Sub-architecture based layout synthesis and Depth-Optimal layout synthesis)
+
+- Layout synthesis using sub-architectures
+- Depth-optimal layout synthesis for optimizing for depth, cx-depth as well as cx-depth-cx-count and depth-cx-count
+
 # Features in Q-Synth v3.0 (Layout aware CNOT synthesis with permutation using Planning, SAT, and QBF, ECAI 2024)
 
 - Four CNOT Synthesis variations with layout restrictions and qubit permutation: S, W, S+R, and W+R
