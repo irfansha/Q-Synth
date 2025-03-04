@@ -1,3 +1,0 @@
-qiskit==0.45.1
-python-sat==0.1.8.dev2
-rustworkx==0.13.1

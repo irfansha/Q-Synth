@@ -1,0 +1,56 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Q-Synth Automated Testing
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Install python dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Download and install pre-built binaries for Bloqqer, Fast-Downward, Caqe and Cadical
+      shell: bash
+      run: |
+        wget https://github.com/KMilkevych/qsynth-binary-dependencies/releases/download/all_binaries/binaries.zip
+        unzip binaries.zip
+        echo "$PWD/binaries/bloqqer" >> $GITHUB_PATH
+        echo "$PWD/binaries/caqe" >> $GITHUB_PATH
+        echo "$PWD/binaries/downward" >> $GITHUB_PATH
+        echo "$PWD/binaries/cadical" >> $GITHUB_PATH
+
+    - name: Install Madagascar
+      shell: bash
+      run: |
+        mkdir madagascar
+        cd madagascar
+        wget https://research.ics.aalto.fi/software/sat/madagascar/M
+        chmod +x M
+        cd ..
+        echo "$PWD/madagascar" >> $GITHUB_PATH
+  
+    - name: Run automated tests with pytest
+      shell: bash
+      run: |
+        cd Tests
+        pytest --disable-warnings

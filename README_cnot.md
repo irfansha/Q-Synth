@@ -1,116 +1,41 @@
-# CNOT Synthesis
+# CNOT Synthesis in Q-Synth (v3.0)
 
-For choosing CNOT (Re)Synthesis use the subcommand 'cnot'.
+For choosing CNOT (Re)Synthesis use the subcommand `cnot`.
 For help, use the following command:
 
     ./q-synth.py cnot --help
 
+## Strong and Weak Equivalence and Layout Restrictions
+
 Given an input quantum CNOT circuit in OPENQASM 2.0 format, we provide 4 synthesis combinations:
-- S   : output is an equivalent optimal CNOT circuit.
-- W   : output is an optimal CNOT circuit equivalent upto a permutation of output qubits.
+- S   : output is an equivalent optimal CNOT circuit (strong equivalence).
+- W   : output is an optimal CNOT circuit equivalent up to a permutation of output qubits (weak equivalence).
 
 If a coupling graph of a physical quantum platform is given as an input:
 - S+R : output is an equivalent optimal CNOT circuit respecting the connectivity restrictions.
-- W+R : output is an optimal CNOT circuit equivalent upto a permutation of output qubits while respecting the connectivity restricitions.
+- W+R : output is an optimal CNOT circuit equivalent up to a permutation of output qubits while respecting the connectivity restrictions.
+
+## Encodings in Planning, SAT and QBF
 
 We employ Classical Planning, SAT and QBF encodings for synthesis.
 We provide gate (CNOT count) and depth optimization metrics.
 For each solving technique, we list the available synthesis combinations:
-- SAT : all 4 combinations, both for gate and depth optimization.
-- QBF : S and S+R combinations, both for gate and depth optimization.
-- Planning : S and S+R combinations only for gate optimization.
+- SAT: all 4 combinations, both for gate and depth optimization.
+- QBF: S and S+R combinations, both for gate and depth optimization.
+- Planning: S and S+R combinations only for gate optimization.
 
-Additionally, given an arbitrary quantum circuit (with gates other than CNOTs), we perform peephole optimization.
-We generate CNOT slices in the given circuit and resynthesize them for chosen synthesis combination and optimization metric.
+## Peephole Optimization
 
-Note: W+R combination is not avaiable for non-CNOT circuits via peephole optimization.
+Additionally, given an arbitrary quantum circuit (with gates beyond CNOT gates), Q-Synth performs peephole optimization.
+We generate the CNOT slices in the given circuit and resynthesize them for the chosen synthesis combination and optimization metric.
 
+Note: W+R combination is not available for non-CNOT circuits via peephole optimization.
 
-## Dependencies:
+## Installation
 
-- Qiskit : https://qiskit.org/
-- QCEC : https://github.com/cda-tum/mqt-qcec (optional)
-- rustworkx : https://github.com/Qiskit/rustworkx
+For detailed instructions on installation, see the [Installation Instructions](INSTALL.md).
 
-For Planning:
-
-- FastDownward : https://www.fast-downward.org/
-
-For SAT-based:
-
-- cadical : https://github.com/arminbiere/cadical
-
-For QBF based:
-
-- caqe : https://github.com/ltentrup/caqe
-- bloqqer : https://fmv.jku.at/bloqqer/
-
-
-## Installation:
-
-### Step 1: Python venv (optional, recommended)
-Make a clean python environment in QSynth folder:
-
-    python3 -m venv QSynth-venv
-    source QSynth-venv/bin/activate
-
-#### For Daily Usage:
-
-Activation: `source QSynth-venv/bin/activate`
-
-Deactivation: `deactivate`
-
-### Step 2: Requirements
-Install python requirements:
-
-    pip install -r requirements-cnot.txt
-
-### Step 3: Solver Installation
-Install appropriate solvers (at least one) for chosen solving techniques.
-
-#### For Planning
-
-FastDownward :
-
-    git clone https://github.com/aibasel/downward.git downward
-    cd downward
-    ./build.py
-    cd ..
-    export PATH=$PWD/downward:$PATH
-
-#### For SAT
-
-Cadical :
-
-    git clone https://github.com/arminbiere/cadical.git cadical
-    cd cadical
-    ./configure && make
-    cd ..
-    export PATH=$PWD/cadical/build:$PATH
-
-### For QBF
-
-Caqe :
-
-    git clone https://github.com/ltentrup/caqe.git caqe
-    cd caqe
-    cargo build --release
-    cd ..
-    export PATH=$PWD/caqe/target/release:$PATH
-
-
-Bloqqer :
-
-
-    git clone https://github.com/rebryant/bloqqer.git bloqqer
-    cd bloqqer
-    ./configure && make
-    cd ..
-    export PATH=$PWD/bloqqer:$PATH
-
-For more details on bloqqer installation, please refer to https://fmv.jku.at/bloqqer/
-
-## USAGE
+## Usage
 
 Q-Synth works by transforming each CNOT sub-circuit in a planning, SAT, or QBF instance, and solving it with an external solver.
 The solution is translated back to reconstruct the corresponding optimal CNOT sub-circuit.
@@ -144,14 +69,12 @@ The solution is translated back to reconstruct the corresponding optimal CNOT su
     -v, --verbose         Verbosity [-1/0/1/2]: 
                             0=status (d), 1=visual, 2=extended, -1=silent
     -h, --help            Help with detailed description of all options
-    --aux_files           location for intermediate files: ./intermediate_files (d)
+    --aux_files           Location for intermediate files: ./intermediate_files (d)
 
 
 ### Debug option
 
-    --check_equivalence   Check equivalence using qcec [0/1]: 0=no (default), 1=yes (*)
-
-(*) requires installing QCEC, install via `pip install mqt.qcec==2.2.3`
+    --check               Check correctness (equivalence, connectivty constraints) [0/1]: 0=no (default), 1=yes
 
 ## Examples for S synthesis:
 
@@ -188,13 +111,13 @@ Instead of 41 CNOT gates from S synthesis, the final CNOT count is only 26.
 
 ## Examples for S+R synthesis:
 
-With S+R resynthesis, we can resynthesis even optimally mapped circuits.
+With S+R synthesis, we can resynthesize even optimally mapped circuits.
 For demonstration, we first W synthesis barenco_tof_3.qasm and optimally map it onto 14-qubit melbourne platform using Q-Synth v2.0.
 The optimally mapped barenco_tof_3.qasm circuit is available in the benchmarks folder:
 
     Benchmarks/ECAI-24/permuted_mapped/barenco_tof_3.qasm
 
-We can resynthesis the circuit while taking layout restrictions (using option `-p melbourne`) into account using the following command:
+We can resynthesize the circuit while taking layout restrictions (using option `-p melbourne`) into account using the following command:
 
     ./q-synth.py cnot -m sat -s cd --minimize gates -p melbourne -v 1 Benchmarks/ECAI-24/permuted_mapped/barenco_tof_3.qasm
 
@@ -204,18 +127,22 @@ One can also optimize the depth while being layout aware similarly.
 ## Examples for W+R synthesis:
 
 We can only apply W+R synthesis for pure CNOT circuits.
-Let us synthesize above example CNOT circuit while being layout aware.
+First we map it to some platform of our choice (`-p tenerife`) using layout synthesis:
+
+    ./q-synth.py layout -m sat -s cd -p tenerife -v 1 Benchmarks/Examples/ecai24.qasm ecai24_mapped.qasm
+
+Let us (re)synthesize above mapped CNOT circuit with 6 CNOTs while being layout aware.
 Use the following command enabling both qubit permutation (flag `-q`) and platform option (`-p tenerife`):
 
-    ./q-synth.py cnot -m sat -s cd --minimize gates -p tenerife -q -v 1 Benchmarks/Examples/ecai24.qasm
+    ./q-synth.py cnot -m sat -s cd --minimize gates -p tenerife -q -v 1 ecai24_mapped.qasm
 
-The optimized circuit now has 5 CNOTs instead of 6 while respecting the connectivity restrictions.
+The optimized circuit now has 2 CNOTs instead of 6 while respecting the connectivity restrictions.
 
 If we only used S+R synthesis for the same instance:
 
-    ./q-synth.py cnot -m sat -s cd --minimize gates -p tenerife -v 1 Benchmarks/Examples/ecai24.qasm
+    ./q-synth.py cnot -m sat -s cd --minimize gates -p tenerife -v 1 ecai24_mapped.qasm
 
-We now need 6 CNOTs instead of 5.
+We now need 3 CNOTs instead of 2.
 
 ## Run Experiments:
 

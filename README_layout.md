@@ -11,103 +11,50 @@ respecting the coupling graph, and minimizing the number of SWAP operations (wit
 We also support ancillary qubits, bridges instead of SWAPS, and relaxed dependencies based on gate commutation rules.
 We employ two main approaches, classical planning (v1.0) and SAT-solver based parallel plans (v2.0).
 
-## Dependencies:
-
-- Qiskit : https://qiskit.org/
-- QCEC : https://github.com/cda-tum/mqt-qcec (optional)
-- rustworkx : https://github.com/Qiskit/rustworkx
-
-For Planning:
-
-- FastDownward : https://www.fast-downward.org/
-- Madagascar : https://research.ics.aalto.fi/software/sat/madagascar/
-
-For SAT-based:
-
-- pysat : https://pysathq.github.io/
-
-
-
 ## Installation:
 
-### Step 1: Python venv (optional, recommended)
-Make a clean python environment in QSynth folder:
+For detailed instructions on installation, see the [Installation Instructions](INSTALL.md).
 
-    python3 -m venv QSynth-venv
-    source QSynth-venv/bin/activate
-
-#### For Daily Usage:
-
-Activation: `source QSynth-venv/bin/activate`
-
-Deactivation: `deactivate`
-
-### Step 2: Requirements
-Install python requirements:
-
-    pip install -r requirements-layout.txt
-
-SAT based layout synthesis (v2.0) is now ready to use.
-Use the following command to test the installation:
-
-    ./q-synth.py layout -v 1
-
-Maps an example circuit 3-qubit or.qasm to 14-qubit IBM melbourne platform with 2 swaps.
-
-### Step 3: Solver Installation for Planning (v1.0) (Optional)
-FastDownward :
-
-    git clone https://github.com/aibasel/downward.git downward
-    cd downward
-    ./build.py
-    cd ..
-    export PATH=$PWD/downward:$PATH
-
-Madagascar :
-
-    Executables are available at : https://research.ics.aalto.fi/software/sat/madagascar/
-
-    Ensure that the location of the executable 'M' is on the $PATH
-
-
-## USAGE
+## Usage
 
 Q-Synth works by transforming a circuit + platform to a classical planning problem (v1.0) or a SAT problem (v2.0), and solving it with an external solver. The solution is translated back to reconstruct the optimally mapped quantum layout.
 
 ### Positional argument:
 
     INPUT.qasm            input circuit file
-    OUTPUT.qasm           output circuit file: None (d)
+    OUTPUT.qasm           output circuit file: None (d), our output file
 
 ### Common Options:
 
     -p, --platform        Quantum platform: tenerife, melbourne (d), tokyo and others
     -b, --bidirectional   Make coupling map bidirectional: 0=no, 1=yes (d), 2=use H-CNOT-H
-    -a, --ancillary       Use ancillary qubits when mapping: 0=no, 1=yes (d) (*)
-    --bridge              (NEW) Use bridges [0/1]. For now only with -r0, -a0, -i1 and -m sat
-    -r, --relaxed         (NEW) Relaxed or Strict Dependencies: 0=strict (d), 1=relaxed
+    -a, --ancillas        Max nr of ancilla qubits: -1=unlimited (d), 0=none, 1,2,... specify max (*)
+    -r, --relaxed         Relaxed or Strict Dependencies: 0=strict (d), 1=relaxed
+    --bridge              Use bridges [0/1]. For now only supported with -r0, -a0 and -m sat
+    --metric              Optimization metric: one of
+                            cx-depth, cx-count, depth, cx-depth-cx-count, depth-cx-count
+    --subarch             Use "subarchitectures" with exact number of ancillas: 0=no (d), 1=yes
 
     -t, --time            Solving time limit in seconds: 1800 (d)
     -v, --verbose         Verbosity [-1/0/1/2/3]: 
                             0=status (d), 1=visual, 2=extended, 3=debug, -1=silent
     -h, --help            Help with detailed description of all options
     --aux_files           location for intermediate files: ./intermediate_files (d)
-    --run                 mode: 0 = encoding only, 1 = layout mapping (d)
 
 ### Classical Planning Options :
 
-    -m, --model           Model type used for the encoding: global, local, lifted
-    -i, --initial         Initial mapping: 0=integrated (d), 1=separate init_map actions
-    -s, --solver          Planners without --model=sat: fd-bjolp (d), fd-ms, and others
+    -m, --model           Model type used for the encoding: -m planning
+                          Chooses a default planner, depending on metrics
+                            count-metric: -m global (d), local, or lifted
+                            depth-metric: -m cond_cost_opt (d), cost_opt, or lc_incr
+    -s, --solver          Planner solvers: fd-bjolp (d), fd-ms, madagascar, and others
 
 ### SAT-based Options :
 
-    -m, --model           Model type used for the encoding: sat (d)
-    -s, --solver          SAT solvers with --model=sat: cd (d), cd15, g4 and others
+    -m, --model           Model type used for the encoding: -m sat (d)
+    -s, --solver          SAT solvers with --model=sat: cd19 (d), g42, cms, etc (1)
     --cardinality         At-Most and At-Least constraints from PySAT: 
-                            0 = pairwise, 1 = seqcounter (d), and others
-    --constraints         Three levels of sat encoding constraints: 
-                            0 = minimal 1 = +pruning 2 = +redundant binary clauses (d)
+                            0 = pairwise, 1 = seqcounter (d), 3 = sortnetwrk, etc (2)
     --start               Solve the sat instances, starting from this depth, 0 (d) (*)
     --step                Solve the sat instances, at depths modulo this step, 1 (d) (*)
     --end                 Solve sat instances until this depth (inclusive) when specified, None (d) (*)
@@ -115,23 +62,20 @@ Q-Synth works by transforming a circuit + platform to a classical planning probl
 ### Experimental Options :
 
     -c, --cnot_cancel     Cancel CNOT gates before layout synthesis: 0=no (d), 1=yes
-    -q, --qiskit_optimize Qiskit post-optimization levels: 
-                            0=none (d), [1,2,3] = standard qiskit levels
-    --near_optimal        Adds bridges along with swaps [0/1], default 0 (*)
-                            (adds  most k+1 bridges, if k is the optimal number of swaps)
-    --parallel_swaps      Adds parallel swaps in each parallel time step [0/1], default 0 (*)
-                            (bounded optimal)
-(*) changing these options might lead to suboptimal results
+    --parallel_swaps      Adds parallel swaps in each time step [0/1], default 0 (*)
+
+(d) default option  
+(*) changing these options might lead to suboptimal results  
+(1) See for all supported SAT solvers: [PySat solvers](https://pysathq.github.io/docs/html/api/solvers.html#pysat.solvers.SolverNames)  
+(2) See for all cardinality constraints: [PySat cardinality](https://pysathq.github.io/docs/html/api/card.html#pysat.card.EncType)
 
 ### Debug option
 
-    --check_equivalence   Check equivalence using qcec [0/1]: 0=no (default), 1=yes (**)
-
-(**) requires installing QCEC, install via `pip install mqt.qcec==2.2.3`
+    --check   Check correctness (equivalence, layout restrictions) [0/1]: 0=no (default), 1=yes
 
 ## Examples with Classical Planning (v1.0):
 
-Map the Adder circuit on platform Tenerife (bi-directional) without using ancillary qubits.
+Map the Adder circuit on platform Tenerife (bi-directional) with 0 ancillary qubits.
 Do this using the local model, with planner FastDownward with Merge-and-Shrink:
 
     ./q-synth.py layout -b1 -a0 -m local -p tenerife -s fd-ms -v1 Benchmarks/ICCAD-23/adder.qasm
@@ -140,9 +84,9 @@ Now map circuit barenco_tof_4.qasm to Melbourne (uni-directed), using FastDownwa
 
     ./q-synth.py layout -b0 -a0 -m local -p melbourne -s fd-bjolp -v1 Benchmarks/ICCAD-23/barenco_tof_4.qasm
 
-This used 7 swaps. Let's now use ancillary bits and write the output to bar4_melbourne.qasm.
+This used 7 swaps. Let's now use unlimited ancillary bits and write the output to bar4_melbourne.qasm.
 
-    ./q-synth.py layout -b0 -a1 -m local -p melbourne -s fd-bjolp -v1 Benchmarks/ICCAD-23/barenco_tof_4.qasm bar4_melbourne.qasm
+    ./q-synth.py layout -b0 -a-1 -m local -p melbourne -s fd-bjolp -v1 Benchmarks/ICCAD-23/barenco_tof_4.qasm bar4_melbourne.qasm
 
 This uses only 6 swaps.
 
@@ -151,22 +95,64 @@ This uses only 6 swaps.
 Map the 10-qubit vbe-adder circuit on platform 14-qubit Melbourne (bi-directional).
 Do this using sat encoding, with sat solver Cadical:
 
-    ./q-synth.py layout -b1 -a1 -m sat -p melbourne -s cd15 -v1 Benchmarks/SAT-24/Standard/vbe_adder_3.qasm
+    ./q-synth.py layout -b1 -a-1 -m sat -p melbourne -s cd15 -v1 Benchmarks/SAT-24/Standard/vbe_adder_3.qasm
 
 This used 8 swaps. Using above planning based approaches timeout after 3 hours.
 We can now solve the same instance within 5 seconds.
 
 Now map circuit 6-qubit mod5mils_65.qasm to 54-qubit Sycamore platform with swaps+bridges:
 
-    ./q-synth.py layout -b1 -a1 -m sat -p sycamore -s cd15 -v1 Benchmarks/SAT-24/Standard/mod5mils_65.qasm  --bridge 1
+    ./q-synth.py layout -b1 -a-1 -m sat -p sycamore -s cd15 -v1 Benchmarks/SAT-24/Standard/mod5mils_65.qasm  --bridge 1
 
 This uses 1 swap and 3 bridges. Let's use relaxed dependencies instead of additional bridges:
 
-    ./q-synth.py layout -b1 -a1 -m sat -p sycamore -s cd15 -v1 Benchmarks/SAT-24/Standard/mod5mils_65.qasm  -r1
+    ./q-synth.py layout -b1 -a-1 -m sat -p sycamore -s cd15 -v1 Benchmarks/SAT-24/Standard/mod5mils_65.qasm  -r1
 
 This uses only 4 swaps.
 
 
+## Examples with Sub-architectures (v4.0):
+
+Map the 5-qubit 4gt13_92 circuit on platform 53-qubit Sycamore (bi-directional) optimizing for cx-count.
+Do this using sub-architectures allowing 2 ancillary qubits:
+
+    ./q-synth.py layout -b1 -a 2 -m sat -p sycamore --subarch 1 -s cd19 -v1 Benchmarks/SAT-24/Standard/4gt13_92.qasm --metric cx-count
+
+This uses 10 swaps.
+
+Map the 8-qubit vqe circuit on platform 127-qubit IBM Eagle (bi-directional) optimizing for cx-count.
+Do this using sub-architectures allowing 0 ancillary qubits:
+
+    ./q-synth.py layout -b1 -a 0 -m sat -p eagle --subarch 1 -s cd19 -v1 Benchmarks/SAT-24/VQE/vqe_8_1_5_100.qasm --metric cx-count
+    
+This uses 3 swaps.
+
+## Examples with Depth-Optimal Synthesis (v4.0):
+
+
+Map the 4-qubit adder circuit on platform 5-qubits Tenerife optimizing for depth.
+
+    ./q-synth.py layout -m sat -p tenerife -s cd19 -v1 Benchmarks/SAT-24/Standard/adder.qasm --metric depth
+
+This gives a circuit with depth 15.
+
+Now let's map this using optimization metric `cx-depth`:
+
+    ./q-synth.py layout -m sat -p tenerife -s cd19 -v1 Benchmarks/SAT-24/Standard/adder.qasm --metric cx-depth
+
+This yields a circuit with cx-depth 10.
+
+One can also optimize for `depth` first, and then `cx-count`:
+
+    ./q-synth.py layout -m sat -p tenerife -s cd19 -v1 Benchmarks/SAT-24/Standard/adder.qasm --metric depth-cx-count
+    
+Which results in a mapped circuit with depth 15 and 1 swap.
+
+It is also possible to combine depth-optimal synthesis with sub-architectures :
+
+    ./q-synth.py layout -m sat -p sycamore -s cd19 -v1 Benchmarks/SAT-24/Standard/4gt13_92.qasm --metric depth-cx-count --subarch 1 -a 2
+
+This will compute the optimal mapping of 5-qubit circuit `4gt13_92` with respect to `depth-cx-count` metric on _7-qubit sub-architectures_ of the 53-qubit sycamore architecture.
 
 ## Run Experiments:
 
