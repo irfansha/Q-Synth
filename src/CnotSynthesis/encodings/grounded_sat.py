@@ -93,24 +93,47 @@ class GroundedSat:
 
             # forall rows, we duplicate the constraints:
             for row_id in range(self.num_qubits):
-                # for each cnot var, if the control qubit is true then the target qubit is flipped:
-                self.constraints.if_and_then_notequal_clauses(
-                    [
-                        self.cnot_variables[time_step][cnot_varid],
-                        self.cells[time_step][row_id][control_id],
-                    ],
-                    self.cells[time_step][row_id][target_id],
-                    self.cells[time_step + 1][row_id][target_id],
-                )
-                # for each cnot var, if the control qubit is false then the target qubit is propagated:
-                self.constraints.if_and_then_equal_clauses(
-                    [
-                        self.cnot_variables[time_step][cnot_varid],
-                        -self.cells[time_step][row_id][control_id],
-                    ],
-                    self.cells[time_step][row_id][target_id],
-                    self.cells[time_step + 1][row_id][target_id],
-                )
+                if self.options.optimal_search != "b":
+                    # for each cnot var, if the control qubit is true then the target qubit is flipped:
+                    self.constraints.if_and_then_notequal_clauses(
+                        [
+                            self.cnot_variables[time_step][cnot_varid],
+                            self.cells[time_step][row_id][control_id],
+                        ],
+                        self.cells[time_step][row_id][target_id],
+                        self.cells[time_step + 1][row_id][target_id],
+                    )
+                    # for each cnot var, if the control qubit is false then the target qubit is propagated:
+                    self.constraints.if_and_then_equal_clauses(
+                        [
+                            self.cnot_variables[time_step][cnot_varid],
+                            -self.cells[time_step][row_id][control_id],
+                        ],
+                        self.cells[time_step][row_id][target_id],
+                        self.cells[time_step + 1][row_id][target_id],
+                    )
+                else:
+                    # for each cnot var, if the control qubit is true then the target qubit is flipped:
+                    # in backward search, we only update if indictor variable is set to true:
+                    self.constraints.if_and_then_notequal_clauses(
+                        [
+                            self.cnot_variables[time_step][cnot_varid],
+                            self.cells[time_step][row_id][control_id],
+                            self.indicator_vars[time_step],
+                        ],
+                        self.cells[time_step][row_id][target_id],
+                        self.cells[time_step + 1][row_id][target_id],
+                    )
+                    # for each cnot var, if the control qubit is false then the target qubit is propagated:
+                    self.constraints.if_and_then_equal_clauses(
+                        [
+                            self.cnot_variables[time_step][cnot_varid],
+                            -self.cells[time_step][row_id][control_id],
+                            self.indicator_vars[time_step],
+                        ],
+                        self.cells[time_step][row_id][target_id],
+                        self.cells[time_step + 1][row_id][target_id],
+                    )
 
         # we imply one of the cnot vars to be true if a touched var is true:
         for target_id in range(self.num_qubits):
@@ -130,6 +153,13 @@ class GroundedSat:
                     self.cells[time_step][row_id][column_id],
                     self.cells[time_step + 1][row_id][column_id],
                 )
+                if self.options.optimal_search == "b":
+                    # We propagate if indicator variable is set to zero, then we propagate:
+                    self.constraints.if_and_then_equal_clauses(
+                        [-self.indicator_vars[time_step]],
+                        self.cells[time_step][row_id][column_id],
+                        self.cells[time_step + 1][row_id][column_id],
+                    )
 
     def generate_transition_cnot_optimal(self, time_step):
         initial_timestep = 0
@@ -196,25 +226,49 @@ class GroundedSat:
                 # Forall rows, we add the cell update clauses:
                 for row_id in range(self.num_qubits):
                     # if the control and target qubits are true, and control cell is also true, then the target cell is flipped:
-                    self.constraints.if_and_then_notequal_clauses(
-                        [
-                            self.control_qvars[time_step][control_id],
-                            self.target_qvars[time_step][target_id],
-                            self.cells[time_step][row_id][control_id],
-                        ],
-                        self.cells[time_step][row_id][target_id],
-                        self.cells[time_step + 1][row_id][target_id],
-                    )
-                    # if the control and target qubits are true, and control cell is false, then the target cell is propagated:
-                    self.constraints.if_and_then_equal_clauses(
-                        [
-                            self.control_qvars[time_step][control_id],
-                            self.target_qvars[time_step][target_id],
-                            -self.cells[time_step][row_id][control_id],
-                        ],
-                        self.cells[time_step][row_id][target_id],
-                        self.cells[time_step + 1][row_id][target_id],
-                    )
+                    if self.options.optimal_search != "b":
+                        self.constraints.if_and_then_notequal_clauses(
+                            [
+                                self.control_qvars[time_step][control_id],
+                                self.target_qvars[time_step][target_id],
+                                self.cells[time_step][row_id][control_id],
+                            ],
+                            self.cells[time_step][row_id][target_id],
+                            self.cells[time_step + 1][row_id][target_id],
+                        )
+                        # if the control and target qubits are true, and control cell is false, then the target cell is propagated:
+                        self.constraints.if_and_then_equal_clauses(
+                            [
+                                self.control_qvars[time_step][control_id],
+                                self.target_qvars[time_step][target_id],
+                                -self.cells[time_step][row_id][control_id],
+                            ],
+                            self.cells[time_step][row_id][target_id],
+                            self.cells[time_step + 1][row_id][target_id],
+                        )
+                    else:
+                        # we only update if the indicator variable is set in the backward search:
+                        self.constraints.if_and_then_notequal_clauses(
+                            [
+                                self.control_qvars[time_step][control_id],
+                                self.target_qvars[time_step][target_id],
+                                self.cells[time_step][row_id][control_id],
+                                self.indicator_vars[time_step],
+                            ],
+                            self.cells[time_step][row_id][target_id],
+                            self.cells[time_step + 1][row_id][target_id],
+                        )
+                        # if the control and target qubits are true, and control cell is false, then the target cell is propagated:
+                        self.constraints.if_and_then_equal_clauses(
+                            [
+                                self.control_qvars[time_step][control_id],
+                                self.target_qvars[time_step][target_id],
+                                -self.cells[time_step][row_id][control_id],
+                                self.indicator_vars[time_step],
+                            ],
+                            self.cells[time_step][row_id][target_id],
+                            self.cells[time_step + 1][row_id][target_id],
+                        )
 
         # if not target qubit then the corresponding cell is propagated to the next time step:
         for column_id in range(self.num_qubits):
@@ -225,6 +279,13 @@ class GroundedSat:
                     self.cells[time_step][row_id][column_id],
                     self.cells[time_step + 1][row_id][column_id],
                 )
+                if self.options.optimal_search == "b":
+                    # We propagate if indicator variable is set to zero, then we propagate:
+                    self.constraints.if_and_then_equal_clauses(
+                        [-self.indicator_vars[time_step]],
+                        self.cells[time_step][row_id][column_id],
+                        self.cells[time_step + 1][row_id][column_id],
+                    )
 
     def generate_initial_gate(self):
         # initial state is specified in time step 0:
@@ -365,6 +426,12 @@ class GroundedSat:
 
         if self.options.verbose > 2:
             print("Cell variables: ", self.cells)
+
+        # for backward search, we use indicator variables to enable the time step:
+        if self.options.optimal_search == "b":
+            self.indicator_vars = self.encoding_variables.get_vars(
+                self.options.plan_length
+            )
 
         self.generate_initial_gate()
 

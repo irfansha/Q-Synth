@@ -1,0 +1,23 @@
+[report]
+exclude_also =
+
+; code under verbose flags
+
+    if .*verbose >
+    
+; code for error checking
+
+    except .*Error
+    raise .*Error
+    print\(f?"Error.*"\)
+    exit\(-1\)
+
+; code for generating output
+
+    if should_output
+    print\(
+
+; Don't complain about methods or code, that isn't meant to run:
+
+    @(abc\.)?abstractmethod
+    if __name__ == .__main__.:

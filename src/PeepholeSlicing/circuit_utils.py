@@ -1,9 +1,15 @@
 # Irfansha Shaik, Aarhus, 05 January 2023.
 
 from qiskit import QuantumCircuit
+from qiskit.circuit import Gate
 from src.PeepholeSlicing.circuit_slice import CircuitSlice as cs
-from src.LayoutSynthesis.circuit_utils import gate_get_qubit, gate_set_qubits, gate_set_qubit
-from src.CnotSynthesis.circuit_utils.clifford_circuit_utils import get_measured_circuit
+from src.LayoutSynthesis.circuit_utils import (
+    gate_get_qubit,
+    gate_set_qubits,
+    gate_set_qubit,
+)
+from src.Utilities.slices import get_slices
+import numpy
 
 
 # we initialize a Quantum circuit for a given number of qubits
@@ -33,15 +39,6 @@ def separate_measurements(circuit, num_qubits, clbits):
 
 
 def equivalence_check_with_map(org_circuit, opt_circuit, qubit_map, verbose=False):
-    # Measuring original circuit:
-    org_circuit_copy = org_circuit.copy()
-    org_circuit_copy.measure_all()
-    if verbose > 1:
-        print(org_circuit_copy)
-    measured_circuit = get_measured_circuit(opt_circuit, qubit_map)
-    if verbose > 1:
-        print(measured_circuit)
-    # checking equivalence:
     if verbose > 0:
         print("Currently, equivalence checking is not supported")
 
@@ -87,78 +84,96 @@ def remove_zero_cost_swaps(circuit, num_qubits):
     return no_swaps_circuit, mapping
 
 
+def is_multiple_of_piby2(param: float) -> bool:
+    return ((param * 2) / numpy.pi).is_integer()
+
+
+def is_cnot(gate: Gate) -> bool:
+    return gate.operation.name in ["cx", "swap"]
+
+
+def is_clifford(gate: Gate) -> bool:
+    clifford_gates = [
+        "x",
+        "y",
+        "z",
+        "cx",
+        "h",
+        "s",
+        "sdg",
+        "x",
+        "sx",
+        "sxdg",
+        "swap",
+        "cz",
+        "cy",
+    ]
+    if gate.operation.name in clifford_gates:
+        return True
+    elif gate.operation.name in ["u3", "rx", "ry", "rz"]:
+        is_clifford_gate = True
+        for param in gate.params:
+            # check if param is a multiple of pi/2:
+            if not is_multiple_of_piby2(param=param):
+                return False
+        return True
+    else:
+        return False
+
+
+def project_circuit(
+    circuit: QuantumCircuit, qubit_map: dict, num_qubits: int
+) -> QuantumCircuit:
+    projected_circuit = QuantumCircuit(num_qubits)
+    for gate in circuit:
+        if len(gate.qubits) == 1:
+            # we update the qubit in the gate:
+            q = gate_get_qubit(gate, 0)
+            newgate = gate_set_qubit(gate, qubit_map[q], num_qubits)
+        else:
+            # we update the qubit in the gate:
+            assert len(gate.qubits) == 2
+            q0 = gate_get_qubit(gate, 0)
+            q1 = gate_get_qubit(gate, 1)
+            newgate = gate_set_qubits(gate, qubit_map[q0], qubit_map[q1], num_qubits)
+        projected_circuit.append(newgate)
+    return projected_circuit
+
+
+def project_coupling_graph(coupling_map: list[list], qubit_map: dict) -> list[list]:
+    projected_coupling_graph = []
+    for [x0, x1] in coupling_map:
+        if x0 in qubit_map and x1 in qubit_map:
+            projected_coupling_graph.append([qubit_map[x0], qubit_map[x1]])
+    return projected_coupling_graph
+
+
 class CircuitUtils:
 
     def gate_get_qubit(self, gate, bit_idx):
         return gate.qubits[bit_idx]._index
 
-    def extract_top_slice(self, allowed_gates):
-        # print("Top slice extraction")
-
-        top_slice = initialize_circuit(self.num_qubits, self.clbits)
-        buffer_circuit = initialize_circuit(self.num_qubits, self.clbits)
-
-        # in the starting all the qubits are free (not blocked):
-        blocked = []
-
-        while True:
-            # TODO: check the edge case when the circuit is at the end:
-            if len(self.circuit) == 0 or len(blocked) == self.num_qubits:
-                # all the qubits are blocked:
-                # we stop and copy rest of the gates to remaining_circuit:
-                remaining_circuit = buffer_circuit.compose(self.circuit)
-                break
-            top_gate = self.circuit.data[0]
-            del self.circuit.data[0]
-            # if single qubit:
-            if len(top_gate.qubits) == 1:
-                qubit = self.gate_get_qubit(top_gate, 0)
-                # only if the qubit is not blocked then
-                if qubit not in blocked:
-                    if top_gate.operation.name in allowed_gates:
-                        top_slice.append(top_gate)
-                    else:
-                        blocked.append(qubit)
-                        buffer_circuit.append(top_gate)
-                else:
-                    buffer_circuit.append(top_gate)
-            elif len(top_gate.qubits) == 2:
-                # we assume that only clifford 2 qubit gates are present in the input circuit:
-                assert top_gate.operation.name in self.clifford_gates
-                qubit1 = self.gate_get_qubit(top_gate, 0)
-                qubit2 = self.gate_get_qubit(top_gate, 1)
-
-                # print(qubit1, qubit2, blocked)
-
-                if (
-                    qubit1 in blocked or qubit2 in blocked
-                ) or top_gate.operation.name not in allowed_gates:
-                    # 2-qubit gate does not belong to the same block:
-                    # we block both the qubits:
-                    if qubit1 not in blocked:
-                        blocked.append(qubit1)
-                    if qubit2 not in blocked:
-                        blocked.append(qubit2)
-
-                    buffer_circuit.append(top_gate)
-                else:
-                    # only when both qubits are not blocked and the operation is allowed i.e., in clifford slice, we add to top slice:
-                    top_slice.append(top_gate)
-        # print(top_slice)
-        # print(remaining_circuit)
-        return top_slice, remaining_circuit
-
-    def extract_all_gates(self):
-        self.all_gates_list = []
-        self.non_optimization_slice_gates = []
-        for gate in self.circuit:
-            if gate.operation.name not in self.all_gates_list:
-                self.all_gates_list.append(gate.operation.name)
-            if (
-                gate.operation.name not in self.non_optimization_slice_gates
-                and gate.operation.name not in self.optimization_slice_gates
-            ):
-                self.non_optimization_slice_gates.append(gate.operation.name)
+    def compute_unused_qubits(self):
+        for slice in self.slices:
+            used_qubits = set()
+            for gate in slice.optimization_slice:
+                # qubit1
+                used_qubits.add(gate_get_qubit(gate, 0))
+                if len(gate.qubits) == 2:
+                    # qubit2
+                    used_qubits.add(gate_get_qubit(gate, 1))
+            slice.used_qubits_optimization_slice = list(used_qubits)
+            # creating map for qubits for projection:
+            slice.projection_map = {
+                k: v for v, k in enumerate(slice.used_qubits_optimization_slice)
+            }
+            slice.reverse_projection_map = {
+                k: v for k, v in enumerate(slice.used_qubits_optimization_slice)
+            }
+            for i in range(self.num_qubits):
+                if i not in used_qubits:
+                    slice.unused_qubits_optimization_slice.append(i)
+            # print(used_qubits)
 
     # Parses domain and problem file:
     def __init__(self, circuit, slice_type, check, verbose=False):
@@ -168,79 +183,33 @@ class CircuitUtils:
             self.clbits = None
         else:
             self.clbits = True
-        org_circuit_copy = circuit.copy()
         self.num_qubits = len(self.circuit.qubits)
         self.circuit, self.circuit_measurements = separate_measurements(
             self.circuit, self.num_qubits, self.clbits
         )
         self.measurementless_circuit = self.circuit.copy()
-        # NOTE: we assume that if a clifford gate is added it is one of the following gate:
-        self.clifford_gates = [
-            "x",
-            "y",
-            "z",
-            "cx",
-            "h",
-            "s",
-            "sdg",
-            "x",
-            "sx",
-            "sxdg",
-            "swap",
-            "cz",
-            "cy",
-        ]
-        # for now, we only look at cnot and swap gates:
-        self.cnot_gates = ["cx", "swap"]
-
-        # we chose slice gates based on the slice type:
+        self.slices = []
+        # adding appropriate predicate:
         if slice_type == "cnot":
-            self.optimization_slice_gates = list(self.cnot_gates)
+            is_valid = is_cnot
         else:
             assert slice_type == "clifford"
-            self.optimization_slice_gates = list(self.clifford_gates)
-
-        # We extract non-clifford gates in the current circuit:
-        self.extract_all_gates()
-
-        # print(self.all_gates_list)
-        # print(self.non_optimization_slice_gates)
-
-        self.slices = []
-
-        while len(self.circuit) != 0:
+            is_valid = is_clifford
+        current_slice_index = 0
+        for non_opt, opt in get_slices(self.circuit, is_valid):
             slice = cs()
-
-            # we extract clifford part first:
-            slice.optimization_slice, self.circuit = self.extract_top_slice(
-                self.optimization_slice_gates
+            slice.non_optimization_slice = initialize_circuit(
+                self.num_qubits, self.clbits
             )
-            slice.non_optimization_slice, self.circuit = self.extract_top_slice(
-                self.non_optimization_slice_gates
-            )
-
-            # print(slice.optimization_slice)
-            # print(slice.non_optimization_slice)
-
+            for i in non_opt:
+                slice.non_optimization_slice.append(self.circuit.data[i])
+            slice.optimization_slice = initialize_circuit(self.num_qubits, self.clbits)
+            for i in opt:
+                slice.optimization_slice.append(self.circuit.data[i])
+            slice.slice_index = current_slice_index
+            current_slice_index = current_slice_index + 1
             self.slices.append(slice)
-
-        # Test if the slices are same as the original circuit:
-        sliced_circuit = initialize_circuit(self.num_qubits, self.clbits)
-
-        for slice in self.slices:
-            sliced_circuit = sliced_circuit.compose(slice.optimization_slice)
-            sliced_circuit = sliced_circuit.compose(slice.non_optimization_slice)
-
-        measured_sliced_circuit = sliced_circuit.copy()
-        # if measurements are not present, we measure all:
-        if self.circuit_measurements == None:
-            measured_sliced_circuit.measure_all()
-            org_circuit_copy.measure_all()
-        else:
-            measured_sliced_circuit = measured_sliced_circuit.compose(
-                self.circuit_measurements
-            )
-
+        self.compute_unused_qubits()
         # checking equivalence:
         if check and verbose > 0:
             print("Currently, equivalence checking is not supported")

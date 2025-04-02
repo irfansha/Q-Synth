@@ -1,10 +1,10 @@
-# Quantum-Circuit Synthesis - Q-Synth v4.0
+# Quantum-Circuit Synthesis - Q-Synth v5.0
 
 Tools for quantum circuit synthesis, compilation and optimization.
 
-    q-synth.py      Optimal Circuit Layout Synthesis and CNOT (Re)Synthesis, based on Classical Planning, SAT, and QBF Solving
+    q-synth.py      Optimal Circuit Layout Synthesis, CNOT (Re)Synthesis, and Clifford (Re)Synthesis, based on Classical Planning, SAT, and QBF Solving
 
-This tool provides two synthesis options Layout Synthesis and CNOT (Re)Synthesis.
+This tool provides three synthesis options Layout Synthesis, CNOT (Re)Synthesis, and Clifford (Re)Synthesis.
 
 ## Installation
 
@@ -39,7 +39,7 @@ For help use the following command:
 
     ./q-synth.py cnot --help
 
-For CNOT Synthesis, this tool takes a quantum circuit in OPENQASM 2.0 format and an optional coupling graph of a physical quantum platform.
+For CNOT Synthesis (v3.0), this tool takes a quantum circuit in OPENQASM 2.0 format and an optional coupling graph of a physical quantum platform.
 The output is a resynthesized circuit in which all CNOT slices are replaced by optimal equivalent sub-circuits.
 
 ### Sample USAGE
@@ -52,6 +52,27 @@ For example, the following command resynthesizes an input_circuit for a platform
     ./q-synth.py cnot -p [platform] [input_circuit] [output_circuit]
 
 For a detailed description of the different synthesis combinations and solvers, see the [CNOT synthesis readme](README_cnot.md) page.
+
+## CNOT-Optimal Clifford (Re)Synthesis
+
+For choosing CNOT-Optimal Clifford Synthesis use the subcommand 'clifford'.
+For help use the following command:
+
+    ./q-synth.py clifford --help
+
+For Clifford Synthesis (v5.0), this tool takes a quantum circuit in OPENQASM 2.0 format and an optional coupling graph of a physical quantum platform.
+The output is a resynthesized circuit in which all Clifford slices are replaced by CNOT-Optimal equivalent sub-circuits.
+
+### Sample USAGE
+
+Q-Synth works by encoding each Clifford sub-circuit to a SAT problem, and solving it with an external solver. The solution is translated back to reconstruct the CNOT-Optimal sub-circuit.
+
+For example, the following command resynthesizes an input_circuit for a platform
+(taking the layout restrictions into account) and returns the optimized output_circuit:
+
+    ./q-synth.py clifford -p [platform] [input_circuit] [output_circuit]
+
+For a detailed description of the different synthesis combinations, see the [Clifford synthesis readme](README_clifford.md) page.
 
 ## Publications
 
@@ -122,6 +143,23 @@ A. B. Clausen, A. B. Jakobsen, _Depth-Optimal Quantum Layout Synthesis through S
 
 and the following [GitHub repository](https://github.com/anbclausen/quills).
 
+Please refer to this publication for CNOT-Optimal Clifford synthesis:
+
+I. Shaik, J. van de Pol, _CNOT-Optimal Clifford Synthesis as SAT_.
+In: CoRR, abs/2504.00634, 2025. arXiv:2504.00634.
+
+    @article{shaik2025cliffordoptimal,
+      author       = {Irfansha Shaik and Jaco van de Pol},
+      title        = {CNOT-Optimal Clifford Synthesis as SAT},
+      journal      = {CoRR},
+      volume       = {abs/2504.00634},
+      eprinttype   = {arXiv},
+      eprint       = {2504.00634},
+      archivePrefix= {arXiv},
+      primaryClass = {quant-ph},
+      year         = {2025}
+    }
+
 ## Limitations
 
 The input should only contain unary gates and binary CNOT gates.
@@ -130,7 +168,7 @@ The script are tested on Linux and macOS.
 
 ## Copyright
 
-(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024
+(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024, 2025
 
 ## Contributors
 

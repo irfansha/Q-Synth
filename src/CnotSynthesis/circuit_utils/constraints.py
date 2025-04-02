@@ -1,5 +1,6 @@
 # Irfansha Shaik, 31.01.2024, Aarhus
 
+
 """
 TODO: Some testing is needed.
 """
@@ -65,7 +66,7 @@ class Constraints:
     # single implication with the then list and
     # for each item in list, if apply reverse implication
     def iff_clauses(self, if_var, then_list):
-        self.if_then_clause(self, if_var, then_list)
+        self.if_then_clause(if_var, then_list)
         for var in then_list:
             self.clause_list.append([-var, if_var])
 
@@ -75,7 +76,7 @@ class Constraints:
             self.clause_list.append([-if_var, var])
 
     def iff_then_each_clause(self, if_var, then_list):
-        self.if_then_each_clause(self, if_var, then_list)
+        self.if_then_each_clause(if_var, then_list)
         temp_clause = [if_var]
         for var in then_list:
             temp_clause.append(-var)

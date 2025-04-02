@@ -14,7 +14,7 @@ from qiskit import QuantumCircuit
 from qiskit.quantum_info import Clifford
 from src.CnotSynthesis.run_planner import RunPlanner as rp
 from src.LayoutSynthesis.circuit_utils import gate_get_qubit
-from src.CnotSynthesis.circuit_utils.clifford_circuit_utils import (
+from src.CliffordSynthesis.circuit_utils import (
     extract_circuit,
     get_measured_circuit,
     compute_and_print_costs,
@@ -73,7 +73,7 @@ def set_options(encoding, planner, time, minimization, verbose, coupling_graph):
     source_location = os.path.dirname(cs.__file__)
     options.domains = os.path.join(source_location, "Domains")
 
-    aux_files = os.path.join(source_location, "intermediate_files")
+    aux_files = "intermediate_files"
 
     if options.coupling_graph:
         # We only handle right now with plain lifted encoding:

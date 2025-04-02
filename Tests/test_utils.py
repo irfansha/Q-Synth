@@ -3,9 +3,17 @@ from typing import Optional
 
 from src.layout_synthesis_wrapper import layout_synthesis as ls_wrapper
 
+from src.CliffordSynthesis.circuit_utils import (
+    compute_cnotdepth_swaps_as_3cx,
+)
+
 CIRCUITS_DIR = "../Benchmarks/SAT-24"
 EXAMPLES_DIR = "../Benchmarks/Examples"
 ECAI_DIR = "../Benchmarks/ECAI-24"
+
+
+def get_cx_depth_swaps_as_3cx(circuit: QuantumCircuit) -> int:
+    return compute_cnotdepth_swaps_as_3cx(circuit)
 
 
 def get_cx_depth(circuit: QuantumCircuit) -> int:
@@ -168,27 +176,40 @@ def generate_subarchitecture_options(
 def generate_peephole_options(
     circuit: str,
     platform: str,
+    slicing: str,
     model: str,
     qubit_permute: Optional[bool],
     minimize: str,
     solver: Optional[str],
     bidirectional: bool,
+    encoding: str = None,
+    gate_ordering: bool = False,
+    simple_path_restrictions: bool = False,
+    disable_unused: bool = False,
+    time: int = 600,
+    optimal_search: str = "f",
 ) -> dict[str, any]:
 
     # Set required options
     options = {
         "circuit_in": circuit,
         "circuit_out": None,
+        "slicing": slicing,
         "minimize": minimize,
         "model": model,
         "qubit_permute": qubit_permute,
+        "optimal_search": optimal_search,
         "solver": solver,
-        "time": 600,
+        "time": time,
         "platform": platform,
         "bidirectional": 1 if bidirectional else 0,
+        "encoding": encoding,
         "intermediate_files_path": "./intermediate_files",
         "verbose": -1,
         "check": True,
+        "gate_ordering": gate_ordering,
+        "simple_path_restrictions": simple_path_restrictions,
+        "disable_unused": disable_unused,
     }
 
     # Return built options

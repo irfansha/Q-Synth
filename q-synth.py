@@ -10,8 +10,8 @@ import textwrap
 from src.layout_config import MODELS, METRICS, SOLVERS
 
 if __name__ == "__main__":
-    version = "Version 4.0"
-    text = f"Q-Synth - Optimal Quantum Layout Synthesis ({version})"
+    version = "Version 5.0"
+    text = f"Q-Synth - Optimal Quantum-Circuit Synthesis ({version})"
     parser = argparse.ArgumentParser(
         description=text,
         formatter_class=argparse.RawTextHelpFormatter,
@@ -232,6 +232,7 @@ if __name__ == "__main__":
         "cnot",
         help="CNOT synthesis via Peephole optimization",
         formatter_class=argparse.RawTextHelpFormatter,
+        epilog="(*) changing these options may result in sub-optimal results",
     )
     cnot_parser.add_argument(
         "circuit_in",
@@ -306,10 +307,27 @@ if __name__ == "__main__":
         action="store_true",
     )
     cnot_parser.add_argument(
+        "--optimal_search",
+        help=textwrap.dedent(
+            """\
+                               search direction to use, only of sat models:
+                                 f  = forward up to the given bound (default)
+                                 uf = unbounded forward, until some solution found
+                                 b  = backward search from a given bound"""
+        ),
+        default="f",
+    )
+    cnot_parser.add_argument(
+        "-d",
+        "--disable_unused",
+        help="allow gates only on used qubits in the original circuit(*)",
+        action="store_true",
+    )
+    cnot_parser.add_argument(
         "-t",
         "--time",
         type=float,
-        help="Solving time limit per slice in seconds, default 600 seconds",
+        help="Solving time limit in seconds, adds 1s per slice as buffer for io, default 600 seconds",
         default=600,
     )
     cnot_parser.add_argument(
@@ -348,10 +366,175 @@ if __name__ == "__main__":
         default=0,
         choices=(0, 1),
     )
+    # Clifford synthesis:
+    clifford_parser = sub_parsers.add_parser(
+        "clifford",
+        help="Clifford synthesis",
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog="(*) changing these options may result in sub-optimal results",
+    )
+    clifford_parser.add_argument(
+        "circuit_in",
+        help="input file: logical quantum circuit (default ?/Benchmarks/ECAI-24/tpar-optimized/barenco_tof_3.qasm)",
+        metavar="INPUT.qasm",
+        nargs="?",
+    )
+    clifford_parser.add_argument(
+        "circuit_out",
+        help="output file: mapped quantum circuit (default None - no output)",
+        nargs="?",
+        metavar="OUTPUT.qasm",
+    )
+    clifford_parser.add_argument(
+        "-v",
+        "--verbose",
+        type=int,
+        help="show intermediate info [0/1/2], default 0",
+        default=0,
+    )
+    clifford_parser.add_argument(
+        "--minimize",
+        help=textwrap.dedent(
+            """\
+                               Minimization metric for Clifford synthesis:
+                                 gates = minimizing number of gates (default)
+                                 depth = depth minimization (only for qbf and sat solvers)"""
+        ),
+        default="gates",
+    )
+    clifford_parser.add_argument(
+        "--aux_files",
+        help="location for intermediate files (default ./intermediate_files)",
+        default="./intermediate_files",
+        metavar="DIR",
+    )
+    clifford_parser.add_argument(
+        "-m",
+        "--model",
+        help=textwrap.dedent(
+            """\
+                               technique to use:
+                                 planning = only for gates optimization
+                                 sat = works with all combinations (default)"""
+        ),
+        default="sat",
+    )
+    clifford_parser.add_argument(
+        "-e",
+        "--encoding",
+        help=textwrap.dedent(
+            """\
+                               encoding to use,
+                               for sat models:
+                                simpleaux = basic encoding with auxiliary variables (default)
+                               for planning models:
+                                gate_optimal = optimizes number of gates
+                                cnot_optimal = optimizes number of CNOT gates"""
+        ),
+        default="simpleaux",
+    )
+    clifford_parser.add_argument(
+        "--optimal_search",
+        help=textwrap.dedent(
+            """\
+                               search direction to use, only of sat models:
+                                 f  = forward up to the given bound (default)
+                                 uf = unbounded forward, until some solution found
+                                 b  = backward search from a given bound"""
+        ),
+        default="f",
+    )
+    clifford_parser.add_argument(
+        "-g", "--gate_ordering", help="fix parallel gate ordering", action="store_true"
+    )
+    clifford_parser.add_argument(
+        "-r",
+        "--simple_path_restrictions",
+        help="allow only simple paths across layers",
+        action="store_true",
+    )
+    clifford_parser.add_argument(
+        "--cycle_bound",
+        type=int,
+        help="number of layers to break cycles with simple path restrictions, default=3; -1 breaks all cycles",
+        default=3,
+    )
+    clifford_parser.add_argument(
+        "-d",
+        "--disable_unused",
+        help="allow gates only on used qubits in the original circuit(*)",
+        action="store_true",
+    )
+    clifford_parser.add_argument(
+        "-s",
+        "--solver",
+        help=textwrap.dedent(
+            """\
+                               Choose either a planner (with --model=planning):
+                                 fd-ms         = seq-opt-merge-and-shrink (default)
+                                 lama          = lama
+                               Or a SAT solver (with --model=sat):
+                                 cd            = cadical (default)
+                                 gimsatul      = gimsatul, a parallel sat solver"""
+        ),
+    )
+    clifford_parser.add_argument(
+        "--nthreads",
+        type=int,
+        help="number of threads for parallel sat solvers, default 4",
+        default=4,
+    )
+    clifford_parser.add_argument(
+        "-q",
+        "--qubit_permute",
+        help="Allow any permutation of qubits",
+        action="store_true",
+    )
+    clifford_parser.add_argument(
+        "-t",
+        "--time",
+        type=float,
+        help="Solving time limit in seconds, adds 1s per slice as buffer for io, default 600 seconds",
+        default=600,
+    )
+    clifford_parser.add_argument(
+        "-p",
+        "--platform",
+        help=textwrap.dedent(
+            """\
+                               Either provider name:
+                                 tenerife  = FakeTenerife/IBM QX2, 5 qubit
+                                 melbourne = FakeMelbourne, 14 qubit
+                                 tokyo     = FakeTokyo, 20 qubit
+                               Or generated platforms:
+                                 rigetti-{8,12,14,16} = various subgraphs of the rigetti platform
+                                 sycamore   = google sycamore platform with grid like topology - 54 qubits
+                                 star-{3,7} = test with 3/7-legged star topology (need swaps before first cnot)
+                                 cycle-5    = cycle of 5 qubits (good for testing use of ancillary bits)
+                                 grid-{4,5,6,7,8}  = nxn grid (standard platforms for experiments)
+                                 test       = test platform (can be anything for experimentation)
+                               If none provided, we do not map (default = None)
+                               """
+        ),
+        default=None,
+    )
+    clifford_parser.add_argument(
+        "-b",
+        "--bidirectional",
+        type=int,
+        help="Make coupling bidirectional [0/1]: 0=no, 1=yes (default)",
+        default=1,
+    )
+    clifford_parser.add_argument(
+        "--check",
+        type=int,
+        help="Check equivalence [0/1]: 0=no (default), 1=yes",
+        default=0,
+    )
 
     args = parser.parse_args()
 
-    # print(args)
+    #  print(args)
 
     try:
         git_label = subprocess.check_output(
@@ -361,14 +544,14 @@ if __name__ == "__main__":
         git_label = "Not under git"
 
     if args.version:
-        print("Q-Synth - Optimal Quantum Layout Synthesis and CNOT resynthesis")
-        print("(c) Irfansha Shaik, Jaco van de Pol, Aarhus, 2023, 2024")
+        print("Q-Synth - Optimal Quantum Layout Synthesis, CNOT resynthesis, and Clifford resynthesis")
+        print("(c) Irfansha Shaik, Jaco van de Pol, Aarhus, 2023, 2024, 2025")
         print(version)
         print("Git commit hash: " + git_label)
         exit(0)
 
     if args.verbose > -1:
-        print("Q-Synth - Optimal Quantum Layout Synthesis and CNOT resynthesis")
+        print("Q-Synth - Optimal Quantum Layout Synthesis and CNOT resynthesis, and Clifford resynthesis")
         print(f"{version}, git commit hash: " + git_label)
         print("arguments:")
         for key, val in vars(args).items():
@@ -449,16 +632,45 @@ if __name__ == "__main__":
             )
 
     elif args.subparser_name == "cnot":
-        from src.peephole_cnotsynthesis import peephole_cnotsynthesis
+        from src.peephole_synthesis import peephole_synthesis
 
         print("CNOT Synthesis")
-        peephole_cnotsynthesis(
+        peephole_synthesis(
             circuit_in=args.circuit_in,
             circuit_out=args.circuit_out,
+            slicing="cnot",
             minimize=args.minimize,
             model=args.model,
             qubit_permute=args.qubit_permute,
+            optimal_search=args.optimal_search,
+            disable_unused=args.disable_unused,
             solver=args.solver,
+            time=args.time,
+            platform=args.platform,
+            bidirectional=args.bidirectional,
+            intermediate_files_path=args.aux_files,
+            verbose=args.verbose,
+            check=args.check,
+        )
+    elif args.subparser_name == "clifford":
+        from src.peephole_synthesis import peephole_synthesis
+
+        print("Clifford Synthesis")
+        peephole_synthesis(
+            circuit_in=args.circuit_in,
+            circuit_out=args.circuit_out,
+            encoding=args.encoding,
+            slicing="clifford",
+            minimize=args.minimize,
+            model=args.model,
+            qubit_permute=args.qubit_permute,
+            optimal_search=args.optimal_search,
+            gate_ordering=args.gate_ordering,
+            simple_path_restrictions=args.simple_path_restrictions,
+            cycle_bound=args.cycle_bound,
+            disable_unused=args.disable_unused,
+            solver=args.solver,
+            nthreads=args.nthreads,
             time=args.time,
             platform=args.platform,
             bidirectional=args.bidirectional,

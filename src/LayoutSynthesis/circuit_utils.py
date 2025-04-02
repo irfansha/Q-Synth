@@ -17,12 +17,18 @@ def gate_set_qubit(gate, bit_idx, num_qubits):
     # Using .replace instead of settings qubits directly
     return gate.replace(qubits=(Qubit(QuantumRegister(num_qubits, "q"), bit_idx),))
 
+
 # Return a new gate with a modified qubit
 # TODO: find the proper way to do this
 def gate_set_qubits(gate, bit_idx0, bit_idx1, num_qubits):
 
     # Using .replace instead of settings qubits directly
-    return gate.replace(qubits=(Qubit(QuantumRegister(num_qubits, "q"), bit_idx0),Qubit(QuantumRegister(num_qubits, "q"), bit_idx1),))
+    return gate.replace(
+        qubits=(
+            Qubit(QuantumRegister(num_qubits, "q"), bit_idx0),
+            Qubit(QuantumRegister(num_qubits, "q"), bit_idx1),
+        )
+    )
 
 
 # return a list of all CNOT gates

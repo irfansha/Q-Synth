@@ -1,5 +1,5 @@
 # Required imports
-from src.peephole_cnotsynthesis import peephole_cnotsynthesis
+from src.peephole_synthesis import peephole_synthesis
 from Tests.test_utils import (
     EXAMPLES_DIR,
     ECAI_DIR,
@@ -12,10 +12,11 @@ from Tests.test_utils import (
 def test_sat_gates_ecai24():
 
     # Compute circuit and opt_val
-    circuit = peephole_cnotsynthesis(
+    circuit = peephole_synthesis(
         **generate_peephole_options(
             circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
             platform=None,
+            slicing="cnot",
             model="sat",
             qubit_permute=False,
             minimize="gates",
@@ -33,10 +34,11 @@ def test_sat_gates_ecai24():
 def test_planning_gates_fd_ecai24():
 
     # Compute circuit and opt_val
-    circuit = peephole_cnotsynthesis(
+    circuit = peephole_synthesis(
         **generate_peephole_options(
             circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
             platform=None,
+            slicing="cnot",
             model="planning",
             qubit_permute=False,
             minimize="gates",
@@ -54,10 +56,11 @@ def test_planning_gates_fd_ecai24():
 def test_planning_gates_madagascar_ecai24():
 
     # Compute circuit and opt_val
-    circuit = peephole_cnotsynthesis(
+    circuit = peephole_synthesis(
         **generate_peephole_options(
             circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
             platform=None,
+            slicing="cnot",
             model="planning",
             qubit_permute=False,
             minimize="gates",
@@ -75,10 +78,11 @@ def test_planning_gates_madagascar_ecai24():
 def test_sat_depth_ecai24():
 
     # Compute circuit and opt_val
-    circuit = peephole_cnotsynthesis(
+    circuit = peephole_synthesis(
         **generate_peephole_options(
             circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
             platform=None,
+            slicing="cnot",
             model="sat",
             qubit_permute=False,
             minimize="depth",
@@ -96,10 +100,11 @@ def test_sat_depth_ecai24():
 def test_planning_depth_fd_ecai24():
 
     # Compute circuit and opt_val
-    circuit = peephole_cnotsynthesis(
+    circuit = peephole_synthesis(
         **generate_peephole_options(
             circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
             platform=None,
+            slicing="cnot",
             model="planning",
             qubit_permute=False,
             minimize="depth",
@@ -117,10 +122,11 @@ def test_planning_depth_fd_ecai24():
 def test_planning_depth_madagascar_ecai24():
 
     # Compute circuit and opt_val
-    circuit = peephole_cnotsynthesis(
+    circuit = peephole_synthesis(
         **generate_peephole_options(
             circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
             platform=None,
+            slicing="cnot",
             model="planning",
             qubit_permute=False,
             minimize="depth",
@@ -138,10 +144,11 @@ def test_planning_depth_madagascar_ecai24():
 def test_sat_gates_qubits_barenco_tof_3():
 
     # Compute circuit and opt_val
-    circuit = peephole_cnotsynthesis(
+    circuit = peephole_synthesis(
         **generate_peephole_options(
             circuit=f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm",
             platform=None,
+            slicing="cnot",
             model="sat",
             qubit_permute=True,
             minimize="gates",
@@ -159,10 +166,11 @@ def test_sat_gates_qubits_barenco_tof_3():
 def test_sat_gates_barenco_tof_3_melbourne():
 
     # Compute circuit and opt_val
-    circuit = peephole_cnotsynthesis(
+    circuit = peephole_synthesis(
         **generate_peephole_options(
             circuit=f"{ECAI_DIR}/permuted_mapped/barenco_tof_3.qasm",
             platform="melbourne",
+            slicing="cnot",
             model="sat",
             qubit_permute=False,
             minimize="gates",
@@ -222,10 +230,11 @@ def test_sat_gates_barenco_tof_3_melbourne():
 def test_qbf_gates_barenco_tof_3():
 
     # Compute circuit and opt_val
-    circuit = peephole_cnotsynthesis(
+    circuit = peephole_synthesis(
         **generate_peephole_options(
             circuit=f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm",
             platform=None,
+            slicing="cnot",
             model="qbf",
             qubit_permute=False,
             minimize="gates",
@@ -243,10 +252,11 @@ def test_qbf_gates_barenco_tof_3():
 def test_qbf_depth_qft_4():
 
     # Compute circuit and opt_val
-    circuit = peephole_cnotsynthesis(
+    circuit = peephole_synthesis(
         **generate_peephole_options(
             circuit=f"{ECAI_DIR}/tpar-optimized/qft_4.qasm",
             platform=None,
+            slicing="cnot",
             model="qbf",
             qubit_permute=False,
             minimize="depth",

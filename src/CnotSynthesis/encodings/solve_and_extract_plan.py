@@ -31,7 +31,8 @@ class SolveandExtractPlan:
     def extract_depth_optimal_plan(self, encoder):
         if self.options.qubit_permute == True:
             self.extract_initial_map(encoder)
-        for cnot_list in encoder.cnot_variables:
+        for time_step in range(len(encoder.cnot_variables)):
+            cnot_list = encoder.cnot_variables[time_step]
             for cnot_var_id in range(len(cnot_list)):
                 cnot_var = cnot_list[cnot_var_id]
                 # if preprocessor removes some variables, we assume they are false:
@@ -39,6 +40,14 @@ class SolveandExtractPlan:
                     continue
                 if self.sol_map[cnot_var]:
                     qubit1, qubit2 = encoder.control_target_dict[cnot_var_id]
+                    # we only add if the indicator variables are enable during backward search:
+                    if encoder.options.optimal_search == "b":
+                        indicator_var = encoder.indicator_vars[time_step]
+                        if (
+                            indicator_var not in self.sol_map
+                            or self.sol_map[indicator_var] == 0
+                        ):
+                            continue
                     self.plan.append(("cnot", "q" + str(qubit1), "q" + str(qubit2)))
 
     def extract_cnot_optimal_plan(self, encoder):
@@ -58,7 +67,14 @@ class SolveandExtractPlan:
                     continue
                 if self.sol_map[cnot_target_var]:
                     cnot_qubit2 = qid
-
+            # we only add if the indicator variables are enable during backward search:
+            if encoder.options.optimal_search == "b":
+                indicator_var = encoder.indicator_vars[plan_step]
+                if (
+                    indicator_var not in self.sol_map
+                    or self.sol_map[indicator_var] == 0
+                ):
+                    continue
             self.plan.append(("cnot", "q" + str(cnot_qubit1), "q" + str(cnot_qubit2)))
 
     def run_command(self, command):
