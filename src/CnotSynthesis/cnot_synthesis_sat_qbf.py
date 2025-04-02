@@ -11,14 +11,15 @@ import os
 import time as clock
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import Clifford
-from src.CnotSynthesis.circuit_utils.clifford_circuit_utils import (
+from src.CliffordSynthesis.circuit_utils import (
     extract_circuit,
     compute_and_print_costs,
     compute_cnotdepth_swaps_as_3cx,
-    compute_cost,
+    compute_cnot_cost,
+    compute_cnot_without_swaps_cost,
+    compute_cnot_depth,
 )
 from src.CnotSynthesis.options import Options as op
-import src.CnotSynthesis.cnot_synthesis_sat_qbf as cs
 from src.CnotSynthesis.cnot_synthesis import equivalence_check
 from src.CnotSynthesis.encodings.lifted_qbf import LiftedQbf
 from src.CnotSynthesis.encodings.grounded_sat import GroundedSat
@@ -37,7 +38,7 @@ def solve_cnot_synth(matrix, options, num_qubits):
         solver.run_caqe()
     else:
         # if a sat solver is called then we use the grounded encoding:
-        assert options.solver == "cadical"
+        assert options.solver == "cd"
         encoder = GroundedSat(matrix, options, num_qubits)
         start_run_time = clock.perf_counter()
         solver.run_cadical()
@@ -118,8 +119,7 @@ def set_options(
     options.check = check
 
     # find Benchmarks and Domains,
-    source_location = os.path.dirname(cs.__file__)
-    aux_files = os.path.join(source_location, intermediate_files_path)
+    aux_files = intermediate_files_path
 
     # we use intermediate directory for intermediate files:
     os.makedirs(aux_files, exist_ok=True)
@@ -166,13 +166,20 @@ def cnot_optimization(
     num_qubits = len(circuit.qubits)
 
     if minimization == "gates":
-        _, bound = compute_cost(circuit)
+        # if qubit permute allows, we ignore swaps:
+        if options.qubit_permute:
+            bound = compute_cnot_without_swaps_cost(circuit)
+        else:
+            bound = compute_cnot_cost(circuit)
         if verbose > 1:
             print("Original number of CNOTs : ", bound)
     else:
-        bound = compute_cnotdepth_swaps_as_3cx(circuit)
+        if options.qubit_permute:
+            bound = compute_cnot_depth(circuit)
+        else:
+            bound = compute_cnotdepth_swaps_as_3cx(circuit)
         if verbose > 1:
-            print("Original circuit depth : ", bound)
+            print("Original circuit CNOT depth : ", bound)
     # initializing optimal circuit with original circuit:
     opt_circuit = circuit
     start_time = clock.perf_counter()
@@ -213,9 +220,9 @@ def cnot_optimization(
                 cur_plan_length += 1
     # backward search:
     elif options.optimal_search == "b":
-        for cur_plan_length in range(bound - 1, 0, -1):
+        while bound > 0:
             # update plan length:
-            options.plan_length = cur_plan_length
+            options.plan_length = bound - 1
             _, cur_opt_circuit, timed_out = cnot_synth_main(matrix, options, num_qubits)
             # we stop if no solution is found:
             if not cur_opt_circuit:
@@ -227,6 +234,17 @@ def cnot_optimization(
                     print("Timed out, search stopped")
                 break
             else:
+                if options.qubit_permute:
+                    # we do not count SWAP gates:
+                    if minimization == "gates":
+                        bound = compute_cnot_without_swaps_cost(cur_opt_circuit)
+                    else:
+                        bound = compute_cnot_depth(cur_opt_circuit)
+                else:
+                    if minimization == "gates":
+                        bound = compute_cnot_cost(cur_opt_circuit)
+                    else:
+                        bound = compute_cnotdepth_swaps_as_3cx(cur_opt_circuit)
                 opt_circuit = cur_opt_circuit
     else:
         assert options.optimal_search == None and options.plan_length != None
@@ -268,6 +286,7 @@ def cnot_optimization_from_file(
     circuit = QuantumCircuit.from_qasm_file(circuit_in)
     if not coupling_graph_check(circuit, coupling_graph):
         print("Circuit CNOT gates don't satisfy the coupling graph restrictions")
+        print("(Hint: use 'q-synth layout' first)")
         exit(-1)
     return cnot_optimization(
         circuit,

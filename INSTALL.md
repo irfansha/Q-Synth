@@ -7,12 +7,14 @@ This corresponds to Step 1 and Step 2 below.
 To use more features of Q-synth requires installing external solvers.
 In particular, to run `./q-synth cnot` requires installing at least
 one planner, one SAT solver, or one QBF solver.
+Similarly, to run `./q-synth clifford` requires installing one SAT solver.
 This corresponds to Steps 3a, 3b and/or 3c below.
 
-| Task           | Classical Planning         | SAT     | QBF            | 
-| ---            | ---                        | ---     | ---            |
-| q-synth layout | FastDownward or Madagascar | PySat   | --             |
-| q-synth cnot   | FastDownward or Madagascar | Cadical | Caqe + Bloqqer |
+| Task              | Classical Planning         | SAT     | QBF            |
+| ---               | ---                        | ---     | ---            |
+| q-synth layout    | FastDownward or Madagascar | PySat   | --             |
+| q-synth cnot      | FastDownward or Madagascar | Cadical | Caqe + Bloqqer |
+| q-synth clifford  | --                         | Cadical | --             |
 
 
 ## Step 1: Python venv
@@ -54,12 +56,12 @@ Maps the 3-qubit circuit `or.qasm` to the 14-qubit IBM platform `melbourne`, usi
 ## Step 3: Installation of Standalone External Solvers
 
 Q-synth uses external solvers to find optimal circuits and layouts.
-Optimal CNOT synthesis needs at least one external solver.
+Optimal CNOT/Clifford synthesis needs at least one external solver.
 Installing extra solvers will increase the capabilities of q-synth.
 
 ### Step 3a: Stand-alone SAT solver
 
-For SAT-based CNOT synthesis, Q-Synth needs an external SAT solver.
+For SAT-based CNOT synthesis and Clifford synthesis, Q-Synth needs an external SAT solver.
 The reason is that pysat doesn't support time-out values.
 
 #### Cadical:
@@ -75,6 +77,10 @@ The reason is that pysat doesn't support time-out values.
 To test CNOT-synthesis with standalone Cadical, use:
 
     ./q-synth.py cnot -v1 Benchmarks/ECAI-24/tpar-optimized/tof_3.qasm
+
+To test CNOT-Optimal Clifford synthesis with standalone Cadical, use:
+
+    ./q-synth.py clifford -v1 Benchmarks/ECAI-24/tpar-optimized/tof_3.qasm
 
 ### Step 3b: Classical Planning
 

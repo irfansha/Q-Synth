@@ -103,18 +103,20 @@ header = [
     "Allow Subarchitectures",
     "Maximal Subarchitectures",
     "Time (s)",
-    "Swaps"
+    "Swaps",
 ]
 
 # Parse data rows from file
 rows = []
-with open(file, 'r') as f:
+with open(file, "r") as f:
     lines = "\n".join(f.readlines())
     rows.append(parse_output(lines))
 
 
 # Write rows
 with open(out, "a", newline="") as csvfile:
-    writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    writer = csv.writer(
+        csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
+    )
     # writer.writerow(header)
     writer.writerows(rows)

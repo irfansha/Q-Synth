@@ -1,3 +1,9 @@
+# Features in Q-Synth v5.0 (CNOT-Optimal Clifford synthesis as SAT)
+
+- Optimal CNOT-count and CNOT-depth synthesis for Clifford circuits as SAT
+- Optional Layout aware synthesis and qubit relabeling
+- Peephole synthesis for arbitrary circuits with optimal synthesis on Clifford slices
+
 # Features in Q-Synth v4.0 (Sub-architecture based layout synthesis and Depth-Optimal layout synthesis)
 
 - Layout synthesis using sub-architectures
