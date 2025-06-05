@@ -137,12 +137,12 @@ Depth-Optimal Synthesis was ported from [GitHub repository](https://github.com/a
 
 Please refer to this Bachelor's Thesis for Sub-Architectures (v4.0):
 
-K. Milkevych, J. van de Pol, _Maximal Sub-architectures for Quantum Mapping_.
+K. Milkevych, _Maximal Sub-architectures for Quantum Mapping_.
     
     @mastersthesis{Milkevych2024
       title        = {Maximal Sub-architectures for Quantum Mapping},
       school       = {Aarhus University},
-      author       = {Kostiantyn V. Milkevych and Jaco van de Pol},
+      author       = {Kostiantyn V. Milkevych},
       year         = {2024},
       type         = {Bachelor's Thesis},
       
