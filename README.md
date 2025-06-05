@@ -76,7 +76,7 @@ For a detailed description of the different synthesis combinations, see the [Cli
 
 ## Publications
 
-Please refer to this publication for Layout-Synthesis based on classical-planning:
+Please refer to this publication for Layout-Synthesis based on classical-planning (v1.0):
 
 I. Shaik, J. van de Pol, _Optimal Layout Synthesis for Quantum Circuits as Classical Planning_. 
 In: Proc. IEEE/ACM IC on Computer-Aided Design, (ICCAD'23), San Francisco, California, USA, 2023.
@@ -90,7 +90,7 @@ In: Proc. IEEE/ACM IC on Computer-Aided Design, (ICCAD'23), San Francisco, Calif
       year         = {2023}
     }
 
-Please refer to this publication for Layout-Synthesis based on SAT encoding:
+Please refer to this publication for Layout-Synthesis based on SAT encoding (v2.0):
 
 I. Shaik, J. van de Pol, _Optimal layout synthesis for deep quantum circuits on NISQ processors with 100+ qubits_.
 
@@ -104,7 +104,7 @@ I. Shaik, J. van de Pol, _Optimal layout synthesis for deep quantum circuits on 
       year         = {2024}
     }
 
-Please refer to this publication for CNOT synthesis (based on Planning, SAT and QBF):
+Please refer to this publication for CNOT synthesis (based on Planning, SAT and QBF) (v3.0):
 
 I. Shaik, J. van de Pol, _Optimal Layout-Aware CNOT Circuit Synthesis with Qubit Permutation_.
 In: Proc. 27th European Conference on Artificial Intelligence, (ECAI'24), Santiago de Compostela, Spain, 2024.
@@ -119,7 +119,22 @@ In: Proc. 27th European Conference on Artificial Intelligence, (ECAI'24), Santia
     }
 
 
-Please refer to this Bachelor's Thesis for Sub-Architectures:
+Please refer to this publication for Depth-Optimal Synthesis (v4.0):
+A. B. Clausen, A. B. Jakobsen, J. van de Pol, I. Shaik, _Depth-Optimal Quantum Layout Synthesis as SAT_.
+
+    @article{Jakobsen2025depthoptimal,
+      author       = {Anna Blume Jakobsen, Anders Benjamin Clausen, Jaco van de Pol and Irfansha Shaik},
+      title        = {Depth-Optimal Quantum Layout Synthesis as SAT},
+      booktitle    = {28th International Conference on Theory and Applications of Satisfiability
+                      Testing, {SAT} 2025, August 12-15, 2025, Glasgow, Scotland},
+      series       = {LIPIcs},
+      publisher    = {Schloss Dagstuhl - Leibniz-Zentrum f{\"{u}}r Informatik},
+      year         = {2025}
+    }
+
+Depth-Optimal Synthesis was ported from [GitHub repository](https://github.com/anbclausen/quills).
+
+Please refer to this Bachelor's Thesis for Sub-Architectures (v4.0):
 K. Milkevych, J. van de Pol, _Maximal Sub-architectures for Quantum Mapping_.
     
     @mastersthesis{Milkevych2024
@@ -131,32 +146,18 @@ K. Milkevych, J. van de Pol, _Maximal Sub-architectures for Quantum Mapping_.
       
     }
 
-Please refer to this Master's Thesis for Depth-Optimal Synthesis:
-A. B. Clausen, A. B. Jakobsen, _Depth-Optimal Quantum Layout Synthesis through Satisfiability_.
 
-    @mastersthesis{Anders2024
-      title        = {Depth-Optimal Quantum Layout Synthesis through Satisfiability},
-      school       = {Aarhus University},
-      author       = {Anders Benjamin Clausen and Anna Blume Jakobsen},
-      year         = {2024},
-    }
-
-and the following [GitHub repository](https://github.com/anbclausen/quills).
-
-Please refer to this publication for CNOT-Optimal Clifford synthesis:
+Please refer to this publication for CNOT-Optimal Clifford synthesis (v5.0):
 
 I. Shaik, J. van de Pol, _CNOT-Optimal Clifford Synthesis as SAT_.
-In: CoRR, abs/2504.00634, 2025. arXiv:2504.00634.
 
-    @article{shaik2025cliffordoptimal,
+    @article{shaikvdP2025cliffordsynthesis,
       author       = {Irfansha Shaik and Jaco van de Pol},
       title        = {CNOT-Optimal Clifford Synthesis as SAT},
-      journal      = {CoRR},
-      volume       = {abs/2504.00634},
-      eprinttype   = {arXiv},
-      eprint       = {2504.00634},
-      archivePrefix= {arXiv},
-      primaryClass = {quant-ph},
+      booktitle    = {28th International Conference on Theory and Applications of Satisfiability
+                      Testing, {SAT} 2025, August 12-15, 2025, Glasgow, Scotland},
+      series       = {LIPIcs},
+      publisher    = {Schloss Dagstuhl - Leibniz-Zentrum f{\"{u}}r Informatik},
       year         = {2025}
     }
 
