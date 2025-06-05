@@ -172,4 +172,4 @@ Use the following bash scripts for running the SAT-2024 experiments with SAT-bas
 
 ## Copyright
 
-(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024
+(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024, 2025

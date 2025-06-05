@@ -125,9 +125,9 @@ One can also optimize the CNOT count while being layout aware similarly.
 
 ## Run Experiments:
 
-Use the following bash scripts for running the ECAI-2024 experiments:
+Use the following bash scripts for running the SAT-2025 experiments:
 
-    cd Scripts/CliffordSynthesis
+    cd Scripts/SAT-25-CliffordSynthesis
     bash run_experiment1.sh
     bash run_experiment2.sh
     bash run_experiment3.sh
