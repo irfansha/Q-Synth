@@ -120,6 +120,7 @@ In: Proc. 27th European Conference on Artificial Intelligence, (ECAI'24), Santia
 
 
 Please refer to this publication for Depth-Optimal Synthesis (v4.0):
+
 A. B. Clausen, A. B. Jakobsen, J. van de Pol, I. Shaik, _Depth-Optimal Quantum Layout Synthesis as SAT_.
 
     @article{Jakobsen2025depthoptimal,
@@ -135,6 +136,7 @@ A. B. Clausen, A. B. Jakobsen, J. van de Pol, I. Shaik, _Depth-Optimal Quantum L
 Depth-Optimal Synthesis was ported from [GitHub repository](https://github.com/anbclausen/quills).
 
 Please refer to this Bachelor's Thesis for Sub-Architectures (v4.0):
+
 K. Milkevych, J. van de Pol, _Maximal Sub-architectures for Quantum Mapping_.
     
     @mastersthesis{Milkevych2024
