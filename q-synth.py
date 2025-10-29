@@ -6,11 +6,11 @@ import argparse
 import datetime
 import subprocess
 import textwrap
-
-from src.layout_config import MODELS, METRICS, SOLVERS
+from qiskit import QuantumCircuit
+from qsynth.layout_config import MODELS, METRICS, SOLVERS
 
 if __name__ == "__main__":
-    version = "Version 5.0"
+    version = "Version 5.1"
     text = f"Q-Synth - Optimal Quantum-Circuit Synthesis ({version})"
     parser = argparse.ArgumentParser(
         description=text,
@@ -213,8 +213,8 @@ if __name__ == "__main__":
                                 cx-count = number of cx gates
                                 cx-depth = maximal depth of cx gates
                                 depth    = maximal circuit depth
-                                depth-cx-count = depth first, then number of cx-gates
-                                cx-depth-cx-count = cx-depth first, then number of cx-gates"""
+                                depth_cx-count = depth first, then number of cx-gates
+                                cx-depth_cx-count = cx-depth first, then number of cx-gates"""
         ),
         default="cx-count",
         choices=METRICS,
@@ -262,8 +262,8 @@ if __name__ == "__main__":
                                  gates = minimizing number of gates (default)
                                  depth = depth minimization (only for qbf and sat solvers)"""
         ),
-        default="gates",
-        choices=("gates", "depth"),
+        default="cx-count",
+        choices=("cx-count", "cx-depth"),
     )
     cnot_parser.add_argument(
         "--aux_files",
@@ -294,7 +294,9 @@ if __name__ == "__main__":
                                  lama          = lama
                                  madagascar    = Madagascar (M) (sequential, optimal)
                                Or a SAT solver (with --model=sat):
-                                 cd            = cadical (default)
+                                 cd            = cadical (needs to installed seperately)
+                                 pysat-cd      = pysat with cadical backend (default)
+                                 pysat-[sat solver name] = pysat with any available backend solver
                                Or a QBF solver (with --mode=qbf):
                                  caqe          = caqe solver with bloqqer preprocessor (default)"""
         ),
@@ -307,16 +309,17 @@ if __name__ == "__main__":
         action="store_true",
     )
     cnot_parser.add_argument(
-        "--optimal_search",
+        "--search_strategy",
         help=textwrap.dedent(
             """\
                                search direction to use, only of sat models:
-                                 f  = forward up to the given bound (default)
-                                 uf = unbounded forward, until some solution found
-                                 b  = backward search from a given bound"""
+                                 forward           = forward up to the given bound (default)
+                                 unbounded-forward = unbounded forward, until some solution found
+                                 backward          = backward search from a given bound"""
         ),
-        default="f",
+        default="forward",
     )
+
     cnot_parser.add_argument(
         "-d",
         "--disable_unused",
@@ -400,7 +403,7 @@ if __name__ == "__main__":
                                  gates = minimizing number of gates (default)
                                  depth = depth minimization (only for qbf and sat solvers)"""
         ),
-        default="gates",
+        default="cx-count",
     )
     clifford_parser.add_argument(
         "--aux_files",
@@ -414,7 +417,7 @@ if __name__ == "__main__":
         help=textwrap.dedent(
             """\
                                technique to use:
-                                 planning = only for gates optimization
+                                 planning = only for gates optimization with/without connectivity restrictions
                                  sat = works with all combinations (default)"""
         ),
         default="sat",
@@ -434,15 +437,15 @@ if __name__ == "__main__":
         default="simpleaux",
     )
     clifford_parser.add_argument(
-        "--optimal_search",
+        "--search_strategy",
         help=textwrap.dedent(
             """\
                                search direction to use, only of sat models:
-                                 f  = forward up to the given bound (default)
-                                 uf = unbounded forward, until some solution found
-                                 b  = backward search from a given bound"""
+                                 forward           = forward up to the given bound (default)
+                                 unbounded-forward = unbounded forward, until some solution found
+                                 backward          = backward search from a given bound"""
         ),
-        default="f",
+        default="forward",
     )
     clifford_parser.add_argument(
         "-g", "--gate_ordering", help="fix parallel gate ordering", action="store_true"
@@ -474,8 +477,11 @@ if __name__ == "__main__":
                                  fd-ms         = seq-opt-merge-and-shrink (default)
                                  lama          = lama
                                Or a SAT solver (with --model=sat):
-                                 cd            = cadical (default)
-                                 gimsatul      = gimsatul, a parallel sat solver"""
+                                 cd            = cadical
+                                 pysat-cd      = pysat with cadical backend (default)
+                                 pysat-[sat solver name] = pysat with any available backend solver
+                                 gimsatul      = gimsatul, a parallel sat solver
+                                 mallob      = mallob, a parallel sat solver"""
         ),
     )
     clifford_parser.add_argument(
@@ -483,6 +489,11 @@ if __name__ == "__main__":
         type=int,
         help="number of threads for parallel sat solvers, default 4",
         default=4,
+    )
+    clifford_parser.add_argument(
+        "--mallob_solver_string",
+        help="solver sequence for mallob, default 'k+(ck)*'",
+        default="k+(ck)*",
     )
     clifford_parser.add_argument(
         "-q",
@@ -544,14 +555,18 @@ if __name__ == "__main__":
         git_label = "Not under git"
 
     if args.version:
-        print("Q-Synth - Optimal Quantum Layout Synthesis, CNOT resynthesis, and Clifford resynthesis")
+        print(
+            "Q-Synth - Optimal Quantum Layout Synthesis, CNOT resynthesis, and Clifford resynthesis"
+        )
         print("(c) Irfansha Shaik, Jaco van de Pol, Aarhus, 2023, 2024, 2025")
         print(version)
         print("Git commit hash: " + git_label)
         exit(0)
 
     if args.verbose > -1:
-        print("Q-Synth - Optimal Quantum Layout Synthesis and CNOT resynthesis, and Clifford resynthesis")
+        print(
+            "Q-Synth - Optimal Quantum Layout Synthesis and CNOT resynthesis, and Clifford resynthesis"
+        )
         print(f"{version}, git commit hash: " + git_label)
         print("arguments:")
         for key, val in vars(args).items():
@@ -563,11 +578,14 @@ if __name__ == "__main__":
         print("Error: Input file not specified.")
         exit(1)
 
+    # Read the input file and convert it into a quantum circuit using Qiskit
+    circuit_in = QuantumCircuit.from_qasm_file(args.circuit_in)
+
     if args.subparser_name == "layout":
         print("Layout Synthesis")
 
         # Import layout synthesis wrapper
-        from src.layout_synthesis_wrapper import layout_synthesis
+        from qsynth.layout_synthesis_wrapper import layout_synthesis
 
         if not args.subarch and args.ancillas > 0:
             print("Ancillas >0: Turning on subarchitectures (--subarch)")
@@ -577,10 +595,12 @@ if __name__ == "__main__":
             print("Using subarchitectures")
 
             # Call subarchitecture mapping with injected layout synthesis
-            from src.Subarchitectures.subarchitectures import subarchitecture_mapping
+            from qsynth.Subarchitectures.subarchitectures import (
+                subarchitecture_mapping,
+            )
 
             subarchitecture_mapping(
-                circuit_in=args.circuit_in,
+                circuit_in=circuit_in,
                 circuit_out=args.circuit_out,
                 platform=args.platform,
                 model=args.model,
@@ -606,7 +626,7 @@ if __name__ == "__main__":
 
             # Making a call to layout synthesis wrapper instead
             layout_synthesis(
-                circuit_in=args.circuit_in,
+                circuit_in=circuit_in,
                 circuit_out=args.circuit_out,
                 platform=args.platform,
                 model=args.model,
@@ -632,17 +652,17 @@ if __name__ == "__main__":
             )
 
     elif args.subparser_name == "cnot":
-        from src.peephole_synthesis import peephole_synthesis
+        from qsynth.peephole_synthesis import peephole_synthesis
 
         print("CNOT Synthesis")
         peephole_synthesis(
-            circuit_in=args.circuit_in,
+            circuit_in=circuit_in,
             circuit_out=args.circuit_out,
             slicing="cnot",
             minimize=args.minimize,
             model=args.model,
             qubit_permute=args.qubit_permute,
-            optimal_search=args.optimal_search,
+            search_strategy=args.search_strategy,
             disable_unused=args.disable_unused,
             solver=args.solver,
             time=args.time,
@@ -651,20 +671,21 @@ if __name__ == "__main__":
             intermediate_files_path=args.aux_files,
             verbose=args.verbose,
             check=args.check,
+            coupling_graph=None,
         )
     elif args.subparser_name == "clifford":
-        from src.peephole_synthesis import peephole_synthesis
+        from qsynth.peephole_synthesis import peephole_synthesis
 
         print("Clifford Synthesis")
         peephole_synthesis(
-            circuit_in=args.circuit_in,
+            circuit_in=circuit_in,
             circuit_out=args.circuit_out,
             encoding=args.encoding,
             slicing="clifford",
             minimize=args.minimize,
             model=args.model,
             qubit_permute=args.qubit_permute,
-            optimal_search=args.optimal_search,
+            search_strategy=args.search_strategy,
             gate_ordering=args.gate_ordering,
             simple_path_restrictions=args.simple_path_restrictions,
             cycle_bound=args.cycle_bound,
@@ -677,4 +698,5 @@ if __name__ == "__main__":
             intermediate_files_path=args.aux_files,
             verbose=args.verbose,
             check=args.check,
+            coupling_graph=None,
         )

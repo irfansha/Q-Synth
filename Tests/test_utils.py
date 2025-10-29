@@ -1,15 +1,15 @@
 from qiskit import QuantumCircuit, QuantumRegister
 from typing import Optional
 
-from src.layout_synthesis_wrapper import layout_synthesis as ls_wrapper
+from qsynth.layout_synthesis_wrapper import layout_synthesis as ls_wrapper
 
-from src.CliffordSynthesis.circuit_utils import (
+from qsynth.CliffordSynthesis.circuit_utils import (
     compute_cnotdepth_swaps_as_3cx,
 )
 
-CIRCUITS_DIR = "../Benchmarks/SAT-24"
-EXAMPLES_DIR = "../Benchmarks/Examples"
-ECAI_DIR = "../Benchmarks/ECAI-24"
+CIRCUITS_DIR = "Benchmarks/SAT-24"
+EXAMPLES_DIR = "Benchmarks/Examples"
+ECAI_DIR = "Benchmarks/ECAI-24"
 
 
 def get_cx_depth_swaps_as_3cx(circuit: QuantumCircuit) -> int:
@@ -187,7 +187,7 @@ def generate_peephole_options(
     simple_path_restrictions: bool = False,
     disable_unused: bool = False,
     time: int = 600,
-    optimal_search: str = "f",
+    search_strategy: str = "forward",
 ) -> dict[str, any]:
 
     # Set required options
@@ -198,7 +198,7 @@ def generate_peephole_options(
         "minimize": minimize,
         "model": model,
         "qubit_permute": qubit_permute,
-        "optimal_search": optimal_search,
+        "search_strategy": search_strategy,
         "solver": solver,
         "time": time,
         "platform": platform,

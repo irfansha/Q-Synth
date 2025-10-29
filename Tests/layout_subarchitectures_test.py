@@ -1,19 +1,22 @@
 # Required imports
-from src.Subarchitectures.subarchitectures import subarchitecture_mapping
+from qsynth.Subarchitectures.subarchitectures import subarchitecture_mapping
 from Tests.test_utils import (
     CIRCUITS_DIR,
     generate_subarchitecture_options,
     count_swaps_cx,
     count_depth_cx_depth,
 )
+from qiskit import QuantumCircuit
 
 
 def test_sycamore_sat_4gt13_92():
+    # Initialize circuit_in
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/4gt13_92.qasm")
 
     # Compute circuit and opt_val
-    circuit, opt_val = subarchitecture_mapping(
+    result = subarchitecture_mapping(
         **generate_subarchitecture_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/4gt13_92.qasm",
+            circuit=circuit_in,
             platform="sycamore",
             model="sat",
             metric="cx-count",
@@ -22,6 +25,8 @@ def test_sycamore_sat_4gt13_92():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     swaps, cx = count_swaps_cx(circuit)
     assert swaps == 10
@@ -29,11 +34,13 @@ def test_sycamore_sat_4gt13_92():
 
 
 def test_tokyo_sat_mod5mils_65():
-
+    circuit_in = QuantumCircuit.from_qasm_file(
+        f"{CIRCUITS_DIR}/Standard/mod5mils_65.qasm"
+    )
     # Compute circuit and opt_val
-    circuit, opt_val = subarchitecture_mapping(
+    result = subarchitecture_mapping(
         **generate_subarchitecture_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/mod5mils_65.qasm",
+            circuit=circuit_in,
             platform="tokyo",
             model="sat",
             metric="cx-count",
@@ -42,6 +49,8 @@ def test_tokyo_sat_mod5mils_65():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     swaps, cx = count_swaps_cx(circuit)
     assert swaps == 0
@@ -49,11 +58,11 @@ def test_tokyo_sat_mod5mils_65():
 
 
 def test_eagle_sat_vqe_8_4_5_100():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/VQE/vqe_8_1_5_100.qasm")
     # Compute circuit and opt_val
-    circuit, opt_val = subarchitecture_mapping(
+    result = subarchitecture_mapping(
         **generate_subarchitecture_options(
-            circuit=f"{CIRCUITS_DIR}/VQE/vqe_8_1_5_100.qasm",
+            circuit=circuit_in,
             platform="eagle",
             model="sat",
             metric="cx-count",
@@ -62,6 +71,8 @@ def test_eagle_sat_vqe_8_4_5_100():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     swaps, cx = count_swaps_cx(circuit)
     assert swaps == 3
@@ -70,10 +81,11 @@ def test_eagle_sat_vqe_8_4_5_100():
 
 # Perform some tests with depth as well
 def test_tokyo_sat_qaoa5_depth():
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/qaoa5.qasm")
     # Compute circuit and opt_val
-    circuit, opt_val = subarchitecture_mapping(
+    result = subarchitecture_mapping(
         **generate_subarchitecture_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/qaoa5.qasm",
+            circuit=circuit_in,
             platform="tokyo",
             model="sat",
             metric="depth",
@@ -82,6 +94,8 @@ def test_tokyo_sat_qaoa5_depth():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     depth, _ = count_depth_cx_depth(circuit)
     assert opt_val == 14
@@ -89,18 +103,21 @@ def test_tokyo_sat_qaoa5_depth():
 
 
 def test_tokyo_sat_qaoa5_cx_depth_cx_count():
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/adder.qasm")
     # Compute circuit and opt_val
-    circuit, opt_val = subarchitecture_mapping(
+    result = subarchitecture_mapping(
         **generate_subarchitecture_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/adder.qasm",
+            circuit=circuit_in,
             platform="tenerife",
             model="sat",
-            metric="cx-depth-cx-count",
+            metric="cx-depth_cx-count",
             solver="cd19",
             num_ancillary_qubits=-1,
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     _, cx_depth = count_depth_cx_depth(circuit)
     swaps, cx_count = count_swaps_cx(circuit)
