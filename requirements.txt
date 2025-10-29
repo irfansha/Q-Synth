@@ -1,5 +1,4 @@
 qiskit>=1.0
-qiskit-ibm-runtime>=0.17.1
 python-sat==1.8.dev13
 rustworkx>=0.14.0
 python-constraint==1.4.0

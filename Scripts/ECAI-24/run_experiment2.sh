@@ -3,11 +3,11 @@
 Path_to_benchmarks="../../Benchmarks/ECAI-24/permuted_mapped/"
 
 declare -a Model_Solver_metric_combinations=(
-   "planning fd-ms gates"
-   "qbf caqe gates"
-   "qbf caqe depth"
-   "sat cd gates"
-   "sat cd depth"
+   "planning fd-ms cx-count"
+   "qbf caqe cx-count"
+   "qbf caqe cx-depth"
+   "sat cd cx-count"
+   "sat cd cx-depth"
 )
 
 Tpar_instances="barenco_tof_3.qasm  barenco_tof_4.qasm  barenco_tof_5.qasm  mod5_4.qasm mod_mult_55.qasm

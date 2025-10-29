@@ -26,8 +26,7 @@ jobs:
     - name: Install python dependencies
       shell: bash
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -e .
         
     - name: Download and install pre-built binaries for Bloqqer, Fast-Downward, Caqe and Cadical
       shell: bash
@@ -44,7 +43,7 @@ jobs:
       run: |
         mkdir madagascar
         cd madagascar
-        wget https://research.ics.aalto.fi/software/sat/madagascar/M
+        wget --no-check-certificate https://research.ics.aalto.fi/software/sat/madagascar/M
         chmod +x M
         cd ..
         echo "$PWD/madagascar" >> $GITHUB_PATH
@@ -52,5 +51,4 @@ jobs:
     - name: Run automated tests with pytest
       shell: bash
       run: |
-        cd Tests
         pytest --disable-warnings

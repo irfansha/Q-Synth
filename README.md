@@ -1,84 +1,85 @@
-# Quantum-Circuit Synthesis - Q-Synth v5.0
+# Quantum-Circuit Synthesis - Q-Synth v5.1
 
-Tools for quantum circuit synthesis, compilation and optimization.
+A state-of-the-art, open-source, optimal quantum circuit synthesis tool.
+This tool provides three main functionalities: 
+- Optimal Layout Synthesis, 
+- Optimal CNOT (Re)Synthesis, and 
+- Optimal Clifford (Re)Synthesis.
 
-    q-synth.py      Optimal Circuit Layout Synthesis, CNOT (Re)Synthesis, and Clifford (Re)Synthesis, based on Classical Planning, SAT, and QBF Solving
+## Key Features
+- Layout Synthesis with Classical Planning and SAT, optimizing CNOT-count/depth (v1.0, v2.0, v4.0).
+- Layout aware CNOT (Re)Synthesis with Planning, SAT and QBF, optimizing CNOT-count/depth (v3.0).
+- Layout aware Clifford (Re)Synthesis with SAT, optimizing CNOT-count/depth (v5.0).
+- CNOT and Clifford re-synthesis can be applied to slices in a peephole synthesis (v3.0, v5.0)
+- Scalable layout synthesis for large platforms via maximal subarchitectures (v4.0).
+- All efficient synthesis features based on SAT are available via an API (with simple pip-installation, v5.1).
+- Additional features with planning and QBF are available via the command line interface.
 
-This tool provides three synthesis options Layout Synthesis, CNOT (Re)Synthesis, and Clifford (Re)Synthesis.
+## Getting started
 
-## Installation
+Q-Synth can be installed using pip:
+> **Recommended:** Please use a fresh python virtual environment.
 
-For detailed instructions on installation, see the [Installation Instructions](INSTALL.md).
+    pip install Q-Synth
 
-## Layout Synthesis
 
-For choosing Layout Synthesis use the subcommand 'layout'.
-For help use the following command:
+### Layout Synthesis
 
-    ./q-synth.py layout --help
+For layout synthesis through the API, simply call `layout_synthesis` with your circuit (as a qiskit QuantumCircuit) and a coupling graph as input. For example:
 
-For Layout Synthesis, this tool takes a quantum circuit in OPENQASM 2.0 format and the coupling graph of a physical quantum platform.
-The output is an optimal mapping of the circuit onto the platform, preserving the gates and their dependencies,
-respecting the coupling graph, and minimizing the number of SWAP operations (with or without using ancillary qubits).
-We employ two main approaches, classical planning (v1.0) and SAT-solver based parallel plans (v2.0).
+    from qsynth import get_coupling_graph, layout_synthesis
+    from qiskit import QuantumCircuit
 
-### Sample USAGE
+    # An example bidirectional coupling graph
+    coupling_graph = get_coupling_graph(coupling_graph=[[0,1],[1,2]], bidirectional=1)
 
-Q-Synth works by transforming a circuit + platform to a classical planning problem (v1.0) or a SAT problem (v2.0), and solving it with an external solver. The solution is translated back to reconstruct the optimally mapped quantum layout.
+    qc = QuantumCircuit(3)
+    qc.cx(0,1)
+    qc.s(0)
+    qc.cx(0,2)
+    qc.cx(1,2)
 
-For example, the following command maps an input_circuit to platform and returns mapped output_circuit:
+    mapped_result = layout_synthesis(circuit=qc, coupling_graph=coupling_graph, metric="cx-count", verbose=-1) # silent mode
+    print(mapped_result.circuit)
+    print(mapped_result.initial_mapping)
+    print(mapped_result.final_mapping)
 
-    ./q-synth.py layout -p [platform] [input_circuit] [output_circuit]
+`mapped_result.circuit` contains the mapped circuit with provably optimal swap count,
+`mapped_result.initial_mapping` contains the initial mapping,
+and `mapped_result.final_mapping` stores the output qubit permutation.
 
-For a detailed description of the available solvers and optimization criteria, see [README_layout.md](README_layout.md).
+### Peephole Synthesis with CNOT and Clifford (Re)Synthesis
 
-## CNOT (Re)Synthesis
+Q-Synth can re-synthesize each CNOT/Clifford sub-circuit in a peephole manner to reduce the CNOT count or depth, while still respecting the layout constraints.  
+For example, we can easily resynthesize our mapped result circuit using peephole synthesis with CNOT slicing using:
 
-For choosing CNOT Synthesis use the subcommand 'cnot'.
-For help use the following command:
+    from qsynth import peephole_synthesis
+    opt_result = peephole_synthesis(circuit=mapped_result.circuit, coupling_graph=coupling_graph, slicing="cnot", metric="cx-count")
 
-    ./q-synth.py cnot --help
+`opt_result.circuit` contains the resynthesized circuit with 5 CNOTs instead of 6 without any extra single qubit gates.
 
-For CNOT Synthesis (v3.0), this tool takes a quantum circuit in OPENQASM 2.0 format and an optional coupling graph of a physical quantum platform.
-The output is a resynthesized circuit in which all CNOT slices are replaced by optimal equivalent sub-circuits.
+Clifford slicing allows resynthesis of even larger sub-circuits with possible further reductions. Simply use `slicing="clifford"` in `peephole_synthesis` to enables this.
 
-### Sample USAGE
+    opt_result = peephole_synthesis(circuit=mapped_result.circuit, coupling_graph=coupling_graph, slicing="clifford", metric="cx-count")
 
-Q-Synth works by encoding each CNOT sub-circuit to a classical planning problem, a SAT problem, or a QBF problem, and solving it with an external solver. The solution is translated back to reconstruct the optimal sub-circuit.
+`opt_result.circuit` now only has 4 CNOTs, but with some additional single qubit gates.
 
-For example, the following command resynthesizes an input_circuit for a platform 
-(taking the layout restrictions into account) and returns the optimized output_circuit:
+### Tutorial and Command-line tools
 
-    ./q-synth.py cnot -p [platform] [input_circuit] [output_circuit]
+Q-Synth also supports several other features such as optimizing for CNOT depth, using subarchitectures, qubit permutations, and more.
+Please refer to tutorials in [Jupyter Notebook](https://github.com/irfansha/Q-Synth/blob/main/Tutorials/qsynth.ipynb) for more examples.
 
-For a detailed description of the different synthesis combinations and solvers, see the [CNOT synthesis readme](README_cnot.md) page.
-
-## CNOT-Optimal Clifford (Re)Synthesis
-
-For choosing CNOT-Optimal Clifford Synthesis use the subcommand 'clifford'.
-For help use the following command:
-
-    ./q-synth.py clifford --help
-
-For Clifford Synthesis (v5.0), this tool takes a quantum circuit in OPENQASM 2.0 format and an optional coupling graph of a physical quantum platform.
-The output is a resynthesized circuit in which all Clifford slices are replaced by CNOT-Optimal equivalent sub-circuits.
-
-### Sample USAGE
-
-Q-Synth works by encoding each Clifford sub-circuit to a SAT problem, and solving it with an external solver. The solution is translated back to reconstruct the CNOT-Optimal sub-circuit.
-
-For example, the following command resynthesizes an input_circuit for a platform
-(taking the layout restrictions into account) and returns the optimized output_circuit:
-
-    ./q-synth.py clifford -p [platform] [input_circuit] [output_circuit]
-
-For a detailed description of the different synthesis combinations, see the [Clifford synthesis readme](README_clifford.md) page.
+More features are available via the command line interface, for instance those based on classical planning and QBF solvers.
+Please see the Installation Instructions in [INSTALL_CLI.md](https://github.com/irfansha/Q-Synth/blob/main/Tutorials/INSTALL_CLI.md).  
+Detailed descriptions of the command-line tools are available in [README_CLI_layout.md](https://github.com/irfansha/Q-Synth/blob/main/Tutorials/README_CLI_layout.md) and
+[README_CLI_cnot.md](https://github.com/irfansha/Q-Synth/blob/main/Tutorials/README_CLI_cnot.md) and
+[README_CLI_clifford.md](https://github.com/irfansha/Q-Synth/blob/main/Tutorials/README_CLI_clifford.md).
 
 ## Publications
 
 Please refer to this publication for Layout-Synthesis based on classical-planning (v1.0):
 
-I. Shaik, J. van de Pol, _Optimal Layout Synthesis for Quantum Circuits as Classical Planning_. 
+I. Shaik, J. van de Pol, _Optimal Layout Synthesis for Quantum Circuits as Classical Planning_.  
 In: Proc. IEEE/ACM IC on Computer-Aided Design, (ICCAD'23), San Francisco, California, USA, 2023.
 
     @inproceedings{ShaikvdP2023,
@@ -92,12 +93,13 @@ In: Proc. IEEE/ACM IC on Computer-Aided Design, (ICCAD'23), San Francisco, Calif
 
 Please refer to this publication for Layout-Synthesis based on SAT encoding (v2.0):
 
-I. Shaik, J. van de Pol, _Optimal layout synthesis for deep quantum circuits on NISQ processors with 100+ qubits_.
+I. Shaik, J. van de Pol, _Optimal layout synthesis for deep quantum circuits on NISQ processors with 100+ qubits_.  
+In: Proc. 27th IC on Theory and Applications of Satisfiability Testing (SAT'24), Pune, India, 2024.
 
     @article{shaikvdP2024layoutsynthesis,
       author       = {Irfansha Shaik and Jaco van de Pol},
       title        = {Optimal Layout Synthesis for Deep Quantum Circuits on {NISQ} Processors with 100+ Qubits}, 
-      booktitle    = {27th International Conference on Theory and Applications of Satisfiability
+      booktitle    = {27th IC on Theory and Applications of Satisfiability
                       Testing, {SAT} 2024, August 21-24, 2024, Pune, India},
       series       = {LIPIcs},
       publisher    = {Schloss Dagstuhl - Leibniz-Zentrum f{\"{u}}r Informatik},
@@ -106,7 +108,7 @@ I. Shaik, J. van de Pol, _Optimal layout synthesis for deep quantum circuits on 
 
 Please refer to this publication for CNOT synthesis (based on Planning, SAT and QBF) (v3.0):
 
-I. Shaik, J. van de Pol, _Optimal Layout-Aware CNOT Circuit Synthesis with Qubit Permutation_.
+I. Shaik, J. van de Pol, _Optimal Layout-Aware CNOT Circuit Synthesis with Qubit Permutation_.  
 In: Proc. 27th European Conference on Artificial Intelligence, (ECAI'24), Santiago de Compostela, Spain, 2024.
 
     @inproceedings{ShaikvdP2024cnotsynthesis,
@@ -121,42 +123,45 @@ In: Proc. 27th European Conference on Artificial Intelligence, (ECAI'24), Santia
 
 Please refer to this publication for Depth-Optimal Synthesis (v4.0):
 
-A. B. Clausen, A. B. Jakobsen, J. van de Pol, I. Shaik, _Depth-Optimal Quantum Layout Synthesis as SAT_.
+A. B. Clausen, A. B. Jakobsen, J. van de Pol, I. Shaik, _Depth-Optimal Quantum Layout Synthesis as SAT_.  
+In: Proc. 28th IC on Theory and Applications of Satisfiability Testing (SAT'25), Glasgow, Scotland, UK, 2025.
 
     @article{Jakobsen2025depthoptimal,
       author       = {Anna Blume Jakobsen, Anders Benjamin Clausen, Jaco van de Pol and Irfansha Shaik},
       title        = {Depth-Optimal Quantum Layout Synthesis as SAT},
-      booktitle    = {28th International Conference on Theory and Applications of Satisfiability
+      booktitle    = {28th IC on Theory and Applications of Satisfiability
                       Testing, {SAT} 2025, August 12-15, 2025, Glasgow, Scotland},
       series       = {LIPIcs},
       publisher    = {Schloss Dagstuhl - Leibniz-Zentrum f{\"{u}}r Informatik},
       year         = {2025}
     }
 
-Depth-Optimal Synthesis was ported from [GitHub repository](https://github.com/anbclausen/quills).
+Depth-Optimal Synthesis was ported from [GitHub repository QuilLS](https://github.com/anbclausen/quills).
 
-Please refer to this Bachelor's Thesis for Sub-Architectures (v4.0):
+Please refer to this publication for Sub-Architectures (v4.0):
 
-K. Milkevych, _Maximal Sub-architectures for Quantum Mapping_.
+K. Milkevych, J. van de Pol, I. Shaik, _Practical Subarchitectures for Optimal Quantum Layout Synthesis_.  
+In: arXiv [quant-ph] 2507.12976, 2025.
     
-    @mastersthesis{Milkevych2024
-      title        = {Maximal Sub-architectures for Quantum Mapping},
-      school       = {Aarhus University},
-      author       = {Kostiantyn V. Milkevych},
-      year         = {2024},
-      type         = {Bachelor's Thesis},
-      
+    @techreport{Kostyantin2025,
+      title         = {Practical Subarchitectures for Optimal Quantum Layout Synthesis},
+      author        = {Kostiantyn V. Milkevych and Jaco van de Pol and Irfansha Shaik},
+      eprint        = {2507.12976},
+      archivePrefix = {arXiv},
+      primaryClass  = {quant-ph},
+      year          = {2025}
     }
 
 
 Please refer to this publication for CNOT-Optimal Clifford synthesis (v5.0):
 
 I. Shaik, J. van de Pol, _CNOT-Optimal Clifford Synthesis as SAT_.
+In: Proc. 28th IC on Theory and Applications of Satisfiability Testing (SAT'25), Glasgow, Scotland, UK, 2025.
 
     @article{shaikvdP2025cliffordsynthesis,
       author       = {Irfansha Shaik and Jaco van de Pol},
       title        = {CNOT-Optimal Clifford Synthesis as SAT},
-      booktitle    = {28th International Conference on Theory and Applications of Satisfiability
+      booktitle    = {28th IC on Theory and Applications of Satisfiability
                       Testing, {SAT} 2025, August 12-15, 2025, Glasgow, Scotland},
       series       = {LIPIcs},
       publisher    = {Schloss Dagstuhl - Leibniz-Zentrum f{\"{u}}r Informatik},
@@ -165,9 +170,13 @@ I. Shaik, J. van de Pol, _CNOT-Optimal Clifford Synthesis as SAT_.
 
 ## Limitations
 
-The input should only contain unary gates and binary CNOT gates.
+Q-Synth has some assumptions about the input circuits:
 
-The script are tested on Linux and macOS.
+- The input should only contain unary gates and binary CNOT gates.
+- We currently do not handle multiple quantum registers in the input circuit.
+
+The scripts are tested on Linux and macOS.
+
 
 ## Copyright
 

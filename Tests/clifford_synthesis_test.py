@@ -1,5 +1,5 @@
 # Required imports
-from src.peephole_synthesis import peephole_synthesis
+from qsynth.peephole_synthesis import peephole_synthesis
 from Tests.test_utils import (
     EXAMPLES_DIR,
     ECAI_DIR,
@@ -8,25 +8,26 @@ from Tests.test_utils import (
     count_depth_cx_depth,
     get_cx_depth_swaps_as_3cx,
 )
+from qiskit import QuantumCircuit
 
 # simpleaux tests:
 
 
 def test_sat_gates_ecai24():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{EXAMPLES_DIR}/ecai24.qasm")
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             model="sat",
             qubit_permute=False,
-            minimize="gates",
-            solver="cd",
+            minimize="cx-count",
+            solver="pysat-cd19",
             bidirectional=False,
         )
-    )
+    ).circuit
 
     # Asserts
     swaps, cx = count_swaps_cx(circuit)
@@ -35,20 +36,20 @@ def test_sat_gates_ecai24():
 
 
 def test_sat_depth_ecai24():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{EXAMPLES_DIR}/ecai24.qasm")
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             model="sat",
             qubit_permute=False,
-            minimize="depth",
-            solver="cd",
+            minimize="cx-depth",
+            solver="pysat-cd19",
             bidirectional=False,
         )
-    )
+    ).circuit
 
     # Asserts
     _, cx_depth = count_depth_cx_depth(circuit)
@@ -56,20 +57,22 @@ def test_sat_depth_ecai24():
 
 
 def test_sat_gates_permute_barenco_tof_3():
-
+    circuit_in = QuantumCircuit.from_qasm_file(
+        f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm"
+    )
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             model="sat",
             qubit_permute=True,
-            minimize="gates",
-            solver="cd",
+            minimize="cx-count",
+            solver="pysat-cd19",
             bidirectional=False,
         )
-    )
+    ).circuit
 
     # Asserts
     swaps, cx = count_swaps_cx(circuit)
@@ -78,20 +81,22 @@ def test_sat_gates_permute_barenco_tof_3():
 
 
 def test_sat_depth_permute_barenco_tof_3():
-
+    circuit_in = QuantumCircuit.from_qasm_file(
+        f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm"
+    )
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             model="sat",
             qubit_permute=True,
-            minimize="depth",
-            solver="cd",
+            minimize="cx-depth",
+            solver="pysat-cd19",
             bidirectional=False,
         )
-    )
+    ).circuit
 
     # Asserts
     _, cx_depth = count_depth_cx_depth(circuit)
@@ -102,22 +107,22 @@ def test_sat_depth_permute_barenco_tof_3():
 
 
 def test_sat_gates_gate_ordering_simple_paths_ecai24():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{EXAMPLES_DIR}/ecai24.qasm")
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             model="sat",
             qubit_permute=False,
-            minimize="gates",
-            solver="cd",
+            minimize="cx-count",
+            solver="pysat-cd19",
             bidirectional=False,
             gate_ordering=True,
             simple_path_restrictions=True,
         )
-    )
+    ).circuit
 
     # Asserts
     swaps, cx = count_swaps_cx(circuit)
@@ -126,22 +131,22 @@ def test_sat_gates_gate_ordering_simple_paths_ecai24():
 
 
 def test_sat_depth_gate_ordering_simple_paths_ecai24():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{EXAMPLES_DIR}/ecai24.qasm")
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             model="sat",
             qubit_permute=False,
-            minimize="depth",
-            solver="cd",
+            minimize="cx-depth",
+            solver="pysat-cd19",
             bidirectional=False,
             gate_ordering=True,
             simple_path_restrictions=True,
         )
-    )
+    ).circuit
 
     # Asserts
     _, cx_depth = count_depth_cx_depth(circuit)
@@ -149,22 +154,24 @@ def test_sat_depth_gate_ordering_simple_paths_ecai24():
 
 
 def test_sat_gates_permute_gate_ordering_simple_paths_barenco_tof_3():
-
+    circuit_in = QuantumCircuit.from_qasm_file(
+        f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm"
+    )
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             model="sat",
             qubit_permute=True,
-            minimize="gates",
-            solver="cd",
+            minimize="cx-count",
+            solver="pysat-cd19",
             bidirectional=False,
             gate_ordering=True,
             simple_path_restrictions=True,
         )
-    )
+    ).circuit
 
     # Asserts
     swaps, cx = count_swaps_cx(circuit)
@@ -173,22 +180,24 @@ def test_sat_gates_permute_gate_ordering_simple_paths_barenco_tof_3():
 
 
 def test_sat_depth_permute_gate_ordering_simple_paths_barenco_tof_3():
-
+    circuit_in = QuantumCircuit.from_qasm_file(
+        f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm"
+    )
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             model="sat",
             qubit_permute=True,
-            minimize="depth",
-            solver="cd",
+            minimize="cx-depth",
+            solver="pysat-cd19",
             bidirectional=False,
             gate_ordering=True,
             simple_path_restrictions=True,
         )
-    )
+    ).circuit
 
     # Asserts
     _, cx_depth = count_depth_cx_depth(circuit)
@@ -199,23 +208,25 @@ def test_sat_depth_permute_gate_ordering_simple_paths_barenco_tof_3():
 
 
 def test_sat_gates_permute_gate_ordering_simple_paths_disable_unused_barenco_tof_3():
-
+    circuit_in = QuantumCircuit.from_qasm_file(
+        f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm"
+    )
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             model="sat",
             qubit_permute=True,
-            minimize="gates",
-            solver="cd",
+            minimize="cx-count",
+            solver="pysat-cd19",
             bidirectional=False,
             gate_ordering=True,
             simple_path_restrictions=True,
             disable_unused=True,
         )
-    )
+    ).circuit
 
     # Asserts
     swaps, cx = count_swaps_cx(circuit)
@@ -224,23 +235,25 @@ def test_sat_gates_permute_gate_ordering_simple_paths_disable_unused_barenco_tof
 
 
 def test_sat_depth_permute_gate_ordering_simple_paths_disable_unused_barenco_tof_3():
-
+    circuit_in = QuantumCircuit.from_qasm_file(
+        f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm"
+    )
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{ECAI_DIR}/tpar-optimized/barenco_tof_3.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             model="sat",
             qubit_permute=True,
-            minimize="depth",
-            solver="cd",
+            minimize="cx-depth",
+            solver="pysat-cd19",
             bidirectional=False,
             gate_ordering=True,
             simple_path_restrictions=True,
             disable_unused=True,
         )
-    )
+    ).circuit
 
     # Asserts
     _, cx_depth = count_depth_cx_depth(circuit)
@@ -248,21 +261,21 @@ def test_sat_depth_permute_gate_ordering_simple_paths_disable_unused_barenco_tof
 
 
 def test_planning_gates_ecai24():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{EXAMPLES_DIR}/ecai24.qasm")
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             encoding="gate_optimal",
             model="planning",
             qubit_permute=False,
-            minimize="gates",
+            minimize="cx-count",
             solver="fd-ms",
             bidirectional=False,
         )
-    )
+    ).circuit
 
     # Asserts
     swaps, cx = count_swaps_cx(circuit)
@@ -271,21 +284,21 @@ def test_planning_gates_ecai24():
 
 
 def test_planning_cnot_optimal_ecai24():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{EXAMPLES_DIR}/ecai24.qasm")
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{EXAMPLES_DIR}/ecai24.qasm",
+            circuit=circuit_in,
             platform=None,
             slicing="clifford",
             encoding="cnot_optimal",
             model="planning",
             qubit_permute=False,
-            minimize="gates",
+            minimize="cx-count",
             solver="fd-ms",
             bidirectional=False,
         )
-    )
+    ).circuit
 
     # Asserts
     swaps, cx = count_swaps_cx(circuit)
@@ -294,21 +307,23 @@ def test_planning_cnot_optimal_ecai24():
 
 
 def test_sat_gates_disable_unused_barenco_tof_3_melbourne():
-
+    circuit_in = QuantumCircuit.from_qasm_file(
+        f"{ECAI_DIR}/permuted_mapped/barenco_tof_3.qasm"
+    )
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{ECAI_DIR}/permuted_mapped/barenco_tof_3.qasm",
+            circuit=circuit_in,
             platform="melbourne",
             slicing="clifford",
             model="sat",
             qubit_permute=False,
-            minimize="gates",
-            solver="cd",
+            minimize="cx-count",
+            solver="pysat-cd19",
             bidirectional=True,  # Bi-directional is important here
             disable_unused=True,
         )
-    )
+    ).circuit
 
     # Asserts (these are wrt. considering swaps as swaps)
     swaps, cx = count_swaps_cx(circuit)
@@ -317,21 +332,23 @@ def test_sat_gates_disable_unused_barenco_tof_3_melbourne():
 
 
 def test_sat_depth_disable_unused_barenco_tof_3_melbourne():
-
+    circuit_in = QuantumCircuit.from_qasm_file(
+        f"{ECAI_DIR}/permuted_mapped/barenco_tof_3.qasm"
+    )
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{ECAI_DIR}/permuted_mapped/barenco_tof_3.qasm",
+            circuit=circuit_in,
             platform="melbourne",
             slicing="clifford",
             model="sat",
             qubit_permute=False,
-            minimize="depth",
-            solver="cd",
+            minimize="cx-depth",
+            solver="pysat-cd19",
             bidirectional=True,  # Bi-directional is important here
             disable_unused=True,
         )
-    )
+    ).circuit
 
     # Asserts
     cx_depth = get_cx_depth_swaps_as_3cx(circuit)
@@ -339,21 +356,21 @@ def test_sat_depth_disable_unused_barenco_tof_3_melbourne():
 
 
 def test_sat_qubits_gates_ecai_24_SR_linear():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{EXAMPLES_DIR}/ecai24_S+R.qasm")
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{EXAMPLES_DIR}/ecai24_S+R.qasm",
+            circuit=circuit_in,
             platform="line-4",
             model="sat",
             slicing="clifford",
             qubit_permute=False,
-            minimize="gates",
-            solver="cd",
+            minimize="cx-count",
+            solver="pysat-cd19",
             bidirectional=True,  # Bi-directional is important here
-            optimal_search="uf",
+            search_strategy="unbounded-forward",
         )
-    )
+    ).circuit
 
     # Asserts (these are wrt. considering swaps as swaps)
     swaps, cx = count_swaps_cx(circuit)
@@ -362,21 +379,21 @@ def test_sat_qubits_gates_ecai_24_SR_linear():
 
 
 def test_sat_qubits_gates_backward_ecai_24_SR_linear():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{EXAMPLES_DIR}/ecai24_S+R.qasm")
     # Compute circuit and opt_val
     circuit = peephole_synthesis(
         **generate_peephole_options(
-            circuit=f"{EXAMPLES_DIR}/ecai24_S+R.qasm",
+            circuit=circuit_in,
             platform="line-4",
             model="sat",
             slicing="clifford",
             qubit_permute=False,
-            minimize="gates",
-            solver="cd",
+            minimize="cx-count",
+            solver="pysat-cd19",
             bidirectional=True,  # Bi-directional is important here
-            optimal_search="b",
+            search_strategy="backward",
         )
-    )
+    ).circuit
 
     # Asserts (these are wrt. considering swaps as swaps)
     swaps, cx = count_swaps_cx(circuit)
@@ -394,8 +411,8 @@ def test_sat_qubits_gates_backward_ecai_24_SR_linear():
 #             platform="tenerife",
 #             model="sat",
 #             qubit_permute=False,
-#             minimize="gates",
-#             solver="cd",
+#             minimize="cx-count",
+#             solver="pysat-cd19",
 #             bidirectional=True  # Bi-directional is important here
 #         )
 #     )

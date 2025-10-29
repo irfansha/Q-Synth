@@ -1,3 +1,7 @@
+# Features in Q-Synth v5.1 (API for SAT based synthesis and easy PyPI Installation)
+- All efficient synthesis features based on SAT are now available via an API (with simple pip-installation).
+- Tutorials are available via Jupyter Notebook.
+
 # Features in Q-Synth v5.0 (CNOT-Optimal Clifford synthesis as SAT)
 
 - Optimal CNOT-count and CNOT-depth synthesis for Clifford circuits as SAT

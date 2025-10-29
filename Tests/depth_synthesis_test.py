@@ -1,19 +1,20 @@
 # Required imports
-from src.DepthOptimal.depthoptimal import depth_optimal_mapping
+from qsynth.DepthOptimal.depthoptimal import depth_optimal_mapping
 from Tests.test_utils import (
     CIRCUITS_DIR,
     generate_depth_options,
     count_swaps_cx,
     count_depth_cx_depth,
 )
+from qiskit import QuantumCircuit
 
 
 def test_tenerife_sat_adder():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/adder.qasm")
     # Compute circuit and opt_val
-    circuit, opt_val = depth_optimal_mapping(
+    result = depth_optimal_mapping(
         **generate_depth_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/adder.qasm",
+            circuit=circuit_in,
             platform="tenerife",
             model="sat",
             solver="cd19",
@@ -23,6 +24,8 @@ def test_tenerife_sat_adder():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     depth, _ = count_depth_cx_depth(circuit)
     assert opt_val == 15
@@ -30,15 +33,15 @@ def test_tenerife_sat_adder():
 
 
 def test_melbourne_sat_adder_mcm():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/adder.qasm")
     # For some reason,
     # depth-optimal can only map adder.qasm on tenerife with cd19
     # other sat solvers work fine
 
     # Compute circuit and opt_val
-    circuit, opt_val = depth_optimal_mapping(
+    result = depth_optimal_mapping(
         **generate_depth_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/adder.qasm",
+            circuit=circuit_in,
             platform="melbourne",
             model="sat",
             solver="mcm",
@@ -48,6 +51,8 @@ def test_melbourne_sat_adder_mcm():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     depth, _ = count_depth_cx_depth(circuit)
     assert opt_val == 11
@@ -55,15 +60,15 @@ def test_melbourne_sat_adder_mcm():
 
 
 def test_tokyo_sat_qaoa5():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/qaoa5.qasm")
     # For some reason,
     # depth-optimal can only map adder.qasm on tenerife with cd19
     # other sat solvers work fine
 
     # Compute circuit and opt_val
-    circuit, opt_val = depth_optimal_mapping(
+    result = depth_optimal_mapping(
         **generate_depth_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/qaoa5.qasm",
+            circuit=circuit_in,
             platform="tokyo",
             model="sat",
             solver="cd19",
@@ -73,6 +78,8 @@ def test_tokyo_sat_qaoa5():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     depth, _ = count_depth_cx_depth(circuit)
     assert depth == 14
@@ -80,11 +87,11 @@ def test_tokyo_sat_qaoa5():
 
 
 def test_tenerife_sat_adder_cx_depth():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/adder.qasm")
     # Compute circuit and opt_val
-    circuit, opt_val = depth_optimal_mapping(
+    result = depth_optimal_mapping(
         **generate_depth_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/adder.qasm",
+            circuit=circuit_in,
             platform="tenerife",
             model="sat",
             solver="cd19",
@@ -94,6 +101,8 @@ def test_tenerife_sat_adder_cx_depth():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     _, cx_depth = count_depth_cx_depth(circuit)
     assert opt_val == 10
@@ -101,11 +110,11 @@ def test_tenerife_sat_adder_cx_depth():
 
 
 def test_tenerife_sat_adder_depth_cx_count():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/adder.qasm")
     # Compute circuit and opt_val
-    circuit, opt_val = depth_optimal_mapping(
+    result = depth_optimal_mapping(
         **generate_depth_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/adder.qasm",
+            circuit=circuit_in,
             platform="tenerife",
             model="sat",
             solver="cd19",
@@ -115,6 +124,8 @@ def test_tenerife_sat_adder_depth_cx_count():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     depth, _ = count_depth_cx_depth(circuit)
     swaps, _ = count_swaps_cx(circuit)
@@ -124,11 +135,11 @@ def test_tenerife_sat_adder_depth_cx_count():
 
 
 def test_tenerife_sat_adder_cx_depth_cx_count():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/adder.qasm")
     # Compute circuit and opt_val
-    circuit, opt_val = depth_optimal_mapping(
+    result = depth_optimal_mapping(
         **generate_depth_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/adder.qasm",
+            circuit=circuit_in,
             platform="tenerife",
             model="sat",
             solver="cd19",
@@ -138,6 +149,8 @@ def test_tenerife_sat_adder_cx_depth_cx_count():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     _, cx_depth = count_depth_cx_depth(circuit)
     swaps, _ = count_swaps_cx(circuit)
@@ -147,11 +160,11 @@ def test_tenerife_sat_adder_cx_depth_cx_count():
 
 
 def test_tenerife_plan_cost_opt_depth_adder():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/adder.qasm")
     # Compute circuit and opt_val
-    circuit, opt_val = depth_optimal_mapping(
+    result = depth_optimal_mapping(
         **generate_depth_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/adder.qasm",
+            circuit=circuit_in,
             platform="tenerife",
             model="cost_opt",
             solver="fd-bjolp",
@@ -161,6 +174,8 @@ def test_tenerife_plan_cost_opt_depth_adder():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     depth, _ = count_depth_cx_depth(circuit)
     assert depth == 13
@@ -168,11 +183,11 @@ def test_tenerife_plan_cost_opt_depth_adder():
 
 
 def test_tenerife_plan_cond_cost_opt_depth_adder():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/adder.qasm")
     # Compute circuit and opt_val
-    circuit, opt_val = depth_optimal_mapping(
+    result = depth_optimal_mapping(
         **generate_depth_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/adder.qasm",
+            circuit=circuit_in,
             platform="tenerife",
             model="cond_cost_opt",
             solver="fd-ms",
@@ -182,6 +197,8 @@ def test_tenerife_plan_cond_cost_opt_depth_adder():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     depth, _ = count_depth_cx_depth(circuit)
     assert depth == 13
@@ -189,11 +206,11 @@ def test_tenerife_plan_cond_cost_opt_depth_adder():
 
 
 def test_tenerife_plan_lc_incr_depth_or():
-
+    circuit_in = QuantumCircuit.from_qasm_file(f"{CIRCUITS_DIR}/Standard/or.qasm")
     # Compute circuit and opt_val
-    circuit, opt_val = depth_optimal_mapping(
+    result = depth_optimal_mapping(
         **generate_depth_options(
-            circuit=f"{CIRCUITS_DIR}/Standard/or.qasm",
+            circuit=circuit_in,
             platform="tenerife",
             model="lc_incr",
             solver="fd-bjolp",
@@ -203,6 +220,8 @@ def test_tenerife_plan_lc_incr_depth_or():
         )
     )
 
+    circuit = result.circuit
+    opt_val = result.opt_val
     # Asserts
     depth, _ = count_depth_cx_depth(circuit)
     assert depth == 8
