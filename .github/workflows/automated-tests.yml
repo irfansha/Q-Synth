@@ -51,5 +51,4 @@ jobs:
     - name: Run automated tests with pytest
       shell: bash
       run: |
-        cd Tests
         pytest --disable-warnings
