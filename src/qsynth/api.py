@@ -145,12 +145,16 @@ def layout_synthesis(
         ), "Upper bound for backward search must be specified"
         start = swap_upper_bound
     # if metric cx-depth we do not allow custom initial mapping :
-    if metric == "cx-depth":
+    if "cx-depth" in metric:
         initial_mapping = None
         if verbose > 0:
             print(
-                "Warning: cx-depth metric is chosen, so initial mapping is ignored and set to None."
+                f"Warning: {metric} metric (with depth optimization) is chosen, so initial mapping is ignored and set to None."
             )
+    if metric == "cx-depth_cx-count" or metric == "cx-count_cx-depth":
+        assert (
+            not subarchitecture
+        ), "Subarchitecture mapping is not yet supported with combined metrics."
     if subarchitecture:
         result = subarchitecture_mapping(
             circuit_in=circuit,

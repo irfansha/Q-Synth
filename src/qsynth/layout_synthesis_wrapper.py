@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import time
 from typing import Optional
 from qiskit import QuantumCircuit
 
@@ -135,7 +136,50 @@ def layout_synthesis(
                 swap_bound=None,  # Do not use swap-bound in favor of depth-bound
                 depth_bound=end,
             )
-
+        case "cx-count_cx-depth":
+            from qsynth.LayoutSynthesis.layout_synthesis import (
+                layout_synthesis as count_optimal_mapping,
+            )
+            from qsynth.CliffordSynthesis.circuit_utils import (
+                compute_cnotdepth_swaps_as_3cx,
+            )
+            from qsynth.DepthOptimal.depthoptimal import depth_optimal_mapping
+            # First perform CNOT count optimal mapping
+            if verbose >= 0:
+                print("Starting cx-count optimal layout synthesis...")
+            # Only setting options through API:
+            start_time = time.time()
+            intermediate_result = count_optimal_mapping(
+                                    circuit_in=circuit_in,
+                                    circuit_out=circuit_out,
+                                    coupling_graph=coupling_graph,
+                                    parallel_swaps=parallel_swaps,
+                                    solver_time=solver_time,
+                                    verbose=verbose,
+                                    allow_ancillas=allow_ancillas,
+                                    )
+            end_time = time.time()
+            swap_count = intermediate_result.circuit.count_ops().get("swap", 0)
+            cx_depth = compute_cnotdepth_swaps_as_3cx(intermediate_result.circuit)
+            remaining_time = solver_time - (end_time - start_time)
+            if verbose >= 0:
+                print(f"Starting cx-depth optimal layout synthesis...")
+            # Then perform cx-depth optimal mapping using the swap count as bound
+            return depth_optimal_mapping(
+                circuit_in=circuit_in,
+                circuit_out=circuit_out,
+                output_initial=None,
+                coupling_graph=coupling_graph,
+                model=model,
+                solver_name=solver,
+                solver_time=remaining_time,
+                cx_optimal=True,
+                swap_optimal=False,
+                allow_ancillas=allow_ancillas,
+                verbose=verbose,
+                swap_bound=swap_count,
+                depth_bound=cx_depth,
+            )
         case _:
             print("Error: Please specify an optimisation metric")
             return None

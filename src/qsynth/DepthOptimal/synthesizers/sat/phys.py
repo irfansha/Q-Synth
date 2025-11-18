@@ -45,7 +45,6 @@ from qsynth.DepthOptimal.util.sat import (
     reset,
 )
 import time
-from threading import Timer
 
 
 class PhysSynthesizer(SATSynthesizer):
@@ -128,8 +127,7 @@ class PhysSynthesizer(SATSynthesizer):
         components = [instr for instr in instrs if not isinstance(instr, Mapped)]
         components.sort(key=lambda instr: instr.level)
 
-        register = QuantumRegister(platform.qubits, "p")
-        circuit = QuantumCircuit(register)
+        circuit = QuantumCircuit(platform.qubits)
 
         for instr in components:
             if isinstance(instr, Gate):
@@ -137,7 +135,7 @@ class PhysSynthesizer(SATSynthesizer):
 
                 remapped_gate = gate.replace(
                     qubits=[
-                        Qubit(register, mapping[instr.level][LogicalQubit(q._index)].id)
+                        mapping[instr.level][LogicalQubit(q._index)].id
                         for q in gate.qubits
                     ]
                 )
@@ -472,15 +470,14 @@ class PhysSynthesizer(SATSynthesizer):
                 if swap_bound:
                     previous_swap_asms.append(swap_asm)
 
-                timer = Timer(time_limit_s - overall_time, solver.interrupt)
-                timer.start()
-
+                remaining_time = time_limit_s - overall_time
+                if remaining_time <= 0:
+                    raise TimeoutError("Timeout")
                 before = time.time()
                 res = solver.solve_limited(
                     assumptions=assumptions, expect_interrupt=True
                 )
                 after = time.time()
-                timer.cancel()
 
                 if res == None:
                     raise TimeoutError("Timeout")
@@ -532,18 +529,16 @@ class PhysSynthesizer(SATSynthesizer):
                             ),
                         )
                         solver.append_formula(swap_asm_constraint)
-                        timer = Timer(time_limit_s - overall_time, solver.interrupt)
-                        timer.start()
-
+                        remaining_time = time_limit_s - overall_time
+                        if remaining_time <= 0:
+                            raise TimeoutError("Timeout")
                         before = time.time()
-                        res = solver.solve_limited(
+                        res = solver.solve(
                             assumptions=asm
                             + [neg(asm) for asm in previous_swap_asms]
                             + [swap_asm],
-                            expect_interrupt=True,
                         )
                         after = time.time()
-                        timer.cancel()
 
                         if res == None:
                             raise TimeoutError("Timeout")
@@ -637,7 +632,7 @@ class PhysSynthesizer(SATSynthesizer):
             )
 
         output_circuit_with_cnots_as_swap = with_swaps_as_cnots(
-            output_circuit, register_name="p"
+            output_circuit
         )
         depth = output_circuit_with_cnots_as_swap.depth()
         output_with_only_cnots = remove_all_non_cx_gates(

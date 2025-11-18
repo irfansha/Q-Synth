@@ -1,5 +1,5 @@
 import math
-from qiskit import QuantumCircuit, QuantumRegister, qasm2
+from qiskit import QuantumCircuit, qasm2
 from qiskit.circuit import Qubit, Instruction, CircuitInstruction
 from itertools import takewhile
 
@@ -134,7 +134,7 @@ def gate_line_dependency_mapping(
         if any(idx is None for idx in input_idxs):
             raise ValueError(f"Gate at index {i} has an input with no index.")
 
-        if name == "rx" or name == "rz":
+        if name == "rx" or name == "ry" or name == "rz":
             angle = instr.operation.params[0]
             name = f"{name}_{angle}"
         if name.startswith("u"):
@@ -297,8 +297,7 @@ def remove_all_non_cx_gates(circuit: QuantumCircuit) -> QuantumCircuit:
     Remove all non-CX gates from the circuit.
     """
     num_qubits = circuit.num_qubits
-    qubit_name = circuit.qregs[0].name
-    new_circuit = QuantumCircuit(QuantumRegister(num_qubits, qubit_name))
+    new_circuit = QuantumCircuit(num_qubits)
     for instr in circuit.data:
         if instr.name == "cx":
             new_circuit.append(instr.operation, instr.qubits)
@@ -311,8 +310,8 @@ def remove_all_non_swap_gates(circuit: QuantumCircuit) -> QuantumCircuit:
     Remove all non-SWAP gates from the circuit.
     """
     num_qubits = circuit.num_qubits
-    qubit_name = circuit.qregs[0].name
-    new_circuit = QuantumCircuit(QuantumRegister(num_qubits, qubit_name))
+    #qubit_name = circuit.qregs[0].name
+    new_circuit = QuantumCircuit(num_qubits)
     for instr in circuit.data:
         if instr.name.startswith("swap"):
             new_circuit.append(instr.operation, qargs=instr.qubits)
@@ -403,8 +402,7 @@ def reinsert_unary_gates(
         for line, gates in line_gate_mapping(cx_circuit).items()
     }
 
-    register = QuantumRegister(cx_circuit.num_qubits, "p")
-    result_circuit = QuantumCircuit(register)
+    result_circuit = QuantumCircuit(cx_circuit.num_qubits)
     mapping = {k.id: v.id for k, v in initial_mapping.items()}
     all_pqubits_in_mapping = len(set(mapping.values())) == len(mapping.values())
     all_lqubits_in_mapping = len(set(mapping.keys())) == len(mapping.keys())
@@ -445,6 +443,9 @@ def reinsert_unary_gates(
                     case name if name.startswith("rx"):
                         theta = float(name.split("_")[1])
                         result_circuit.rx(theta, physical_line)
+                    case name if name.startswith("ry"):
+                        theta = float(name.split("_")[1])
+                        result_circuit.ry(theta, physical_line)
                     case name if name.startswith("rz"):
                         phi = float(name.split("_")[1])
                         result_circuit.rz(phi, physical_line)
@@ -457,44 +458,14 @@ def reinsert_unary_gates(
                         theta = float(name.split("_")[1])
                         phi = float(name.split("_")[2])
                         lam = float(name.split("_")[3])
-                        instr = CircuitInstruction(
-                            operation=Instruction(
-                                name="u3",
-                                num_qubits=1,
-                                num_clbits=0,
-                                params=[theta, phi, lam],
-                            ),
-                            qubits=(Qubit(register, physical_line),),
-                            clbits=(),
-                        )
-                        result_circuit.append(instr)
+                        result_circuit.u(theta, phi, lam, physical_line)
                     case name if name.startswith("u2"):
                         phi = float(name.split("_")[1])
                         lam = float(name.split("_")[2])
-                        instr = CircuitInstruction(
-                            operation=Instruction(
-                                name="u2",
-                                num_qubits=1,
-                                num_clbits=0,
-                                params=[phi, lam],
-                            ),
-                            qubits=(Qubit(register, physical_line),),
-                            clbits=(),
-                        )
-                        result_circuit.append(instr)
+                        result_circuit.u(math.pi/2, phi, lam, physical_line)
                     case name if name.startswith("u1"):
                         lam = float(name.split("_")[1])
-                        instr = CircuitInstruction(
-                            operation=Instruction(
-                                name="u1",
-                                num_qubits=1,
-                                num_clbits=0,
-                                params=[lam],
-                            ),
-                            qubits=(Qubit(register, physical_line),),
-                            clbits=(),
-                        )
-                        result_circuit.append(instr)
+                        result_circuit.u(0.0, 0.0, lam, physical_line)
                     case _:
                         raise ValueError(
                             f"Unknown unary gate: '{gate_name}'... Perhaps you should add it to the match statement?"
@@ -574,11 +545,11 @@ def reinsert_unary_gates(
     return result_circuit
 
 
-def with_swaps_as_cnots(circuit: QuantumCircuit, register_name: str):
+def with_swaps_as_cnots(circuit: QuantumCircuit):
     """
     Replaces all SWAP gates with CNOT gates.
     """
-    new_circuit = QuantumCircuit(QuantumRegister(circuit.num_qubits, register_name))
+    new_circuit = QuantumCircuit(circuit.num_qubits)
     for instr in circuit.data:
 
         if instr.name.startswith("swap"):
@@ -651,13 +622,12 @@ def save_circuit(
     num_qubits: int | None = None,
 ):
     if num_qubits == None:
-        register = QuantumRegister(circuit.num_qubits, "q")
+        output_circuit = QuantumCircuit(circuit.num_qubits)
     else:
-        register = QuantumRegister(num_qubits, "q")
-    output_circuit = QuantumCircuit(register)
+        output_circuit = QuantumCircuit(num_qubits)
     for instr in circuit.data:
         new_instr = instr.replace(
-            qubits=[Qubit(register, q._index) for q in instr.qubits]
+            qubits=[Qubit(output_circuit.qregs[0], q._index) for q in instr.qubits]
         )
         output_circuit.append(new_instr)
     circuit_file = open(file_path, "w")

@@ -110,7 +110,7 @@ def is_clifford(gate: Gate) -> bool:
     ]
     if gate.operation.name in clifford_gates:
         return True
-    elif gate.operation.name in ["u3", "rx", "ry", "rz"]:
+    elif gate.operation.name in ["u", "u1", "u2", "u3", "rx", "ry", "rz"]:
         is_clifford_gate = True
         for param in gate.params:
             # check if param is a multiple of pi/2:
