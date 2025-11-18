@@ -176,8 +176,7 @@ def equality_check(
 
 #     output_mapping = line_gate_mapping(output_circuit)
 
-#     register = QuantumRegister(input_circuit.num_qubits, "p")
-#     mapped_output = QuantumCircuit(register)
+#     mapped_output = QuantumCircuit(input_circuit.num_qubits)
 #     output_circuit_data = output_circuit.data
 
 #     reverse_initial = {p.id: l.id for l, p in initial_mapping.items()}

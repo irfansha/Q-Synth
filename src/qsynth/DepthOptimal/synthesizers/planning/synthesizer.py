@@ -79,7 +79,7 @@ class PlanningSynthesizer(ABC):
 
         """
         initial_mapping = {}
-        physical_circuit = QuantumCircuit(QuantumRegister(platform.qubits, "p"))
+        physical_circuit = QuantumCircuit(platform.qubits)
         gate_logical_mapping = gate_line_dependency_mapping(original_circuit)
 
         def add_to_initial_mapping_if_not_present(
@@ -171,7 +171,7 @@ class PlanningSynthesizer(ABC):
         """
 
         initial_mapping = {}
-        physical_circuit = QuantumCircuit(QuantumRegister(platform.qubits, "p"))
+        physical_circuit = QuantumCircuit(platform.qubits)
         gate_logical_mapping = gate_line_dependency_mapping(original_circuit)
 
         def add_to_initial_mapping_if_not_present(
@@ -322,7 +322,7 @@ class PlanningSynthesizer(ABC):
                     )
 
                 physical_circuit_with_cnots_as_swap = with_swaps_as_cnots(
-                    physical_circuit, register_name="p"
+                    physical_circuit
                 )
                 depth = physical_circuit_with_cnots_as_swap.depth()
                 physical_with_only_cnots = remove_all_non_cx_gates(
@@ -418,7 +418,7 @@ class PlanningSynthesizer(ABC):
                         )
 
                     physical_circuit_with_cnots_as_swap = with_swaps_as_cnots(
-                        physical_circuit, register_name="p"
+                        physical_circuit
                     )
                     depth = physical_circuit_with_cnots_as_swap.depth()
                     physical_with_only_cnots = remove_all_non_cx_gates(
