@@ -1,9 +1,10 @@
-# Quantum-Circuit Synthesis - Q-Synth v5.1
+# Quantum-Circuit Synthesis - Q-Synth v6.0.beta
 
 A state-of-the-art, open-source, optimal quantum circuit synthesis tool.
 This tool provides three main functionalities: 
 - Optimal Layout Synthesis, 
-- Optimal CNOT (Re)Synthesis, and 
+- Optimal CNOT (Re)Synthesis,
+- Optimal CNOT+Rz (Re)Synthesis (beta), and 
 - Optimal Clifford (Re)Synthesis.
 
 ## Key Features
@@ -13,6 +14,8 @@ This tool provides three main functionalities:
 - CNOT and Clifford re-synthesis can be applied to slices in a peephole synthesis (v3.0, v5.0)
 - Scalable layout synthesis for large platforms via maximal subarchitectures (v4.0).
 - All efficient synthesis features based on SAT are available via an API (with simple pip-installation, v5.1).
+- Optimal Clifford (Re)Synthesis via Planning, with combined CNOT-count + 1q-count optimization (v6.0.beta).
+- Optimal CNOT+Rz (Re)Synthesis with SAT, optimizing CNOT-count/depth (v6.0.beta).
 - Additional features with planning and QBF are available via the command line interface.
 
 ## Getting started
@@ -20,24 +23,25 @@ This tool provides three main functionalities:
 Q-Synth can be installed using pip:
 > **Recommended:** Please use a fresh python virtual environment.
 
-    pip install Q-Synth
+    pip install --pre Q-Synth
 
 
 ### Layout Synthesis
 
 For layout synthesis through the API, simply call `layout_synthesis` with your circuit (as a qiskit QuantumCircuit) and a coupling graph as input. For example:
 
-    from qsynth import get_coupling_graph, layout_synthesis
+    from qsynth import make_bidirectional_graph, layout_synthesis
     from qiskit import QuantumCircuit
 
     # An example bidirectional coupling graph
-    coupling_graph = get_coupling_graph(coupling_graph=[[0,1],[1,2]], bidirectional=1)
+    coupling_graph = make_bidirectional_graph([[0,1],[1,2]])
 
     qc = QuantumCircuit(3)
     qc.cx(0,1)
-    qc.s(0)
-    qc.cx(0,2)
-    qc.cx(1,2)
+    qc.s(1)
+    qc.cx(2,1)
+    qc.cx(0,1)
+    qc.cx(2,0)
 
     mapped_result = layout_synthesis(circuit=qc, coupling_graph=coupling_graph, metric="cx-count", verbose=-1) # silent mode
     print(mapped_result.circuit)
@@ -53,16 +57,22 @@ and `mapped_result.final_mapping` stores the output qubit permutation.
 Q-Synth can re-synthesize each CNOT/Clifford sub-circuit in a peephole manner to reduce the CNOT count or depth, while still respecting the layout constraints.  
 For example, we can easily resynthesize our mapped result circuit using peephole synthesis with CNOT slicing using:
 
-    from qsynth import peephole_synthesis
-    opt_result = peephole_synthesis(circuit=mapped_result.circuit, coupling_graph=coupling_graph, slicing="cnot", metric="cx-count")
+    from qsynth import cnot_peephole_synthesis
+    opt_result = cnot_peephole_synthesis(circuit=mapped_result.circuit, coupling_graph=coupling_graph, metric="cx-count")
 
-`opt_result.circuit` contains the resynthesized circuit with 5 CNOTs instead of 6 without any extra single qubit gates.
+`opt_result.circuit` contains the resynthesized circuit with 5 CNOTs instead of 7 without any extra single qubit gates.
 
-Clifford slicing allows resynthesis of even larger sub-circuits with possible further reductions. Simply use `slicing="clifford"` in `peephole_synthesis` to enables this.
+CNOT+Rz slicing allows resynthesis of larger sub-circuits (now including rz gates) with possible further reductions. Use `cnot_rz_peephole_synthesis` to enables this.
 
-    opt_result = peephole_synthesis(circuit=mapped_result.circuit, coupling_graph=coupling_graph, slicing="clifford", metric="cx-count")
+    opt_result = cnot_rz_peephole_synthesis(circuit=mapped_result.circuit, coupling_graph=coupling_graph, metric="cx-count")
 
-`opt_result.circuit` now only has 4 CNOTs, but with some additional single qubit gates.
+`opt_result.circuit` now has 4 CNOTs instead of 5, without any extra single qubit gates.
+
+Clifford slicing allows resynthesis of even larger sub-circuits (now including all Clifford gates) with possible further reductions. Simply use `clifford_peephole_synthesis` to enables this.
+
+    opt_result = clifford_peephole_synthesis(circuit=mapped_result.circuit, coupling_graph=coupling_graph, metric="cx-count")
+
+`opt_result.circuit` now only has 3 CNOTs, but with some additional single qubit gates. It is possible to further reduce the single qubit gates, more examples are available in the [Jupyter Notebook](https://github.com/irfansha/Q-Synth/blob/main/Tutorials/qsynth.ipynb).
 
 ### Tutorial and Command-line tools
 
@@ -141,15 +151,14 @@ Depth-Optimal Synthesis was ported from [GitHub repository QuilLS](https://githu
 Please refer to this publication for Sub-Architectures (v4.0):
 
 K. Milkevych, J. van de Pol, I. Shaik, _Practical Subarchitectures for Optimal Quantum Layout Synthesis_.  
-In: arXiv [quant-ph] 2507.12976, 2025.
+In: Proc. 7th IW on Quantum Software Engineering (QSE'26), New York, NY, USA, 2026.
     
-    @techreport{Kostyantin2025,
+    @inproceedings{Kostyantin2026,
       title         = {Practical Subarchitectures for Optimal Quantum Layout Synthesis},
       author        = {Kostiantyn V. Milkevych and Jaco van de Pol and Irfansha Shaik},
-      eprint        = {2507.12976},
-      archivePrefix = {arXiv},
-      primaryClass  = {quant-ph},
-      year          = {2025}
+      booktitle     = {Proceedings of the 7th IEEE/ACM International Workshop on Quantum Software Engineering (QSE'26), New York, NY, USA, 2026},
+      publisher     = {Association for Computing Machinery},
+      year          = {2026}
     }
 
 
@@ -168,6 +177,21 @@ In: Proc. 28th IC on Theory and Applications of Satisfiability Testing (SAT'25),
       year         = {2025}
     }
 
+
+Please refer to this publication for Optimal Clifford Synthesis as Planning (v6.0.beta):
+
+I. Shaik, J. van de Pol, _Optimal Clifford Synthesis as Planning_.
+In: Proc. 36th International Conference on Automated Planning and Scheduling (ICAPS'26), Dublin, Ireland, 2026.
+
+    @article{shaikvdP2026cliffordsynthesisplanning,
+      author       = {Irfansha Shaik and Jaco van de Pol},
+      title        = {Optimal Clifford Synthesis as Planning},
+      booktitle    = {36th International Conference on Automated Planning and Scheduling
+                      (ICAPS'26), Dublin, Ireland, 2026},
+      year         = {2026}
+    }
+
+
 ## Limitations
 
 Q-Synth has some assumptions about the input circuits:
@@ -180,7 +204,7 @@ The scripts are tested on Linux and macOS.
 
 ## Copyright
 
-(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024, 2025
+(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024, 2025, 2026.
 
 ## Contributors
 
@@ -189,3 +213,4 @@ The scripts are tested on Linux and macOS.
 - Anna Blume Jakobsen (depth-optimal layout mapping)
 - Anders B. Clausen (depth-optimal layout mapping)
 - Kostiantyn Milkevych (subarchitectures, testing)
+- Rasmus Ruby Bagge (CNOT+Rz synthesis, testing)

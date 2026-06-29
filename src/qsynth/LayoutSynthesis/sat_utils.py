@@ -513,8 +513,8 @@ def twoway_constraints(self, tstep):
 
 def ALO_twoway_cnot_constraints(self, tstep):
 
-    # if tstep is 0, then one of the cnots is true:
-    if tstep == 0 and len(self.cur_sb.cnot_vars) > 0:
+    # if tstep is 0 and no initial mapping is given, then one of the cnots is true:
+    if tstep == 0 and len(self.cur_sb.cnot_vars) > 0 and self.args.initial_mapping is None:
         AtleastOne_constraints(self, self.cur_sb.cnot_vars)
 
     # if assumption var is true, then all the successor vars are false:

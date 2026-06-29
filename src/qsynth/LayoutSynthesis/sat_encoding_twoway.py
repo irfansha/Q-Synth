@@ -281,7 +281,7 @@ class SatEncodingTwoway:
                     print(
                         f"Started solving backwards with upper bound: {self.cur_upper_bound}",
                     )
-                while unsat_bound_found == False:
+                while unsat_bound_found == False and tstep >= 0:
                     self.solve_and_extract(
                         sat_solver=s,
                         tstep=self.cur_upper_bound,

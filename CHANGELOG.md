@@ -1,4 +1,11 @@
+# Features in Q-Synth v6.0.beta (Optimal Clifford Synthesis as Planning, and CNOT+Rz Synthesis)
+
+- Optimal Clifford (Re)Synthesis via Planning, with combined CNOT-count + 1q-count optimization
+- Optimal CNOT+Rz (Re)Synthesis with SAT, optimizing CNOT-count or CNOT-depth
+- CNOT+Rz re-synthesis can be applied to slices in a peephole synthesis
+
 # Features in Q-Synth v5.1 (API for SAT based synthesis and easy PyPI Installation)
+
 - All efficient synthesis features based on SAT are now available via an API (with simple pip-installation).
 - Tutorials are available via Jupyter Notebook.
 

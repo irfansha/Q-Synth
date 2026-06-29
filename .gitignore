@@ -109,6 +109,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+upload_venv/
 
 # Spyder project settings
 .spyderproject
@@ -154,11 +155,22 @@ QSynth-venv/*
 *.qasm
 *.patch
 
+.idea
+
 # Testing
 Tests/tmp/
+Tests/conftest.py
 
 # Solvers
 madagascar/
+downward/
+binaries/
+*.sas
 
 # Tutorial
 Tutorials/mapped_*.qasm
+
+# But DO keep the ICAPS Clifford-synthesis benchmark inputs
+!Benchmarks/Random-Clifford/sat_synthesized/*.qasm
+!Benchmarks/QECC/sat_optimized/*.qasm
+!Tutorials/03q_55125.qasm

@@ -23,6 +23,10 @@ from qsynth.CnotSynthesis.options import Options as op
 from qsynth.CnotSynthesis.cnot_synthesis import equivalence_check
 from qsynth.CnotSynthesis.encodings.lifted_qbf import LiftedQbf
 from qsynth.CnotSynthesis.encodings.grounded_sat import GroundedSat
+from qsynth.ReachabilitySolver.encodings.cnot_synthesis.cnot_reachability_utils import \
+    check_circuit_equivalence_of_cnot_circuits
+from qsynth.ReachabilitySolver.encodings.cnot_synthesis.cnot_synthesis_reachability import \
+    optimize_cnot_circuit_with_reachability_encoding
 from qsynth.Utilities.run_solvers import RunSolvers
 from qsynth.CnotSynthesis.encodings.extract_plan import ExtractPlan
 from qsynth.CnotSynthesis.cnot_synthesis import coupling_graph_check
@@ -177,9 +181,17 @@ def cnot_optimization(
     qubit_permute=False,
     intermediate_files_path="intermediate_files",
     check=0,
-    report_timeout=False,
     cardinality=1,
 ):
+    ############################# REACHABILITY IMPLEMENTATION #################################
+    if search_strategy not in ["forward", "backward", "unbounded-forward"]:
+        result = optimize_cnot_circuit_with_reachability_encoding(circuit, qubit_permute, coupling_graph, minimization,
+                                                                  search_strategy, time, intermediate_files_path)
+        if check and result.circuit is not None:
+            check_circuit_equivalence_of_cnot_circuits(circuit, result.circuit)
+        return result
+
+    ############################# ORIGINAL IMPLEMENTATION #################################
     # if coupling graph is not None, we set platform to custom:
     if coupling_graph is not None:
         platform = "custom"
@@ -243,6 +255,7 @@ def cnot_optimization(
     # initializing optimal circuit with original circuit:
     opt_circuit = circuit
     start_time = clock.perf_counter()
+    timed_out = False
     # forward search:
     if options.search_strategy == "forward":
         for cur_plan_length in range(bound):
@@ -325,27 +338,21 @@ def cnot_optimization(
     total_time = clock.perf_counter() - start_time
     if options.verbose > 0:
         print(f"Time taken: {total_time}")
+
+    if opt_circuit is None:
+        return MappingResult(circuit=circuit, no_plan_found=True)
+
     # if opt circuit in not None, then we compute costs and check equivalence:
-    if opt_circuit != None:
-        compute_and_print_costs(
-            circuit,
-            opt_circuit,
-            cnot_minimization=minimization,
-            verbose=options.verbose,
-        )
-        if options.check:
-            equivalence_check(circuit, opt_circuit, None, options)
-    # We do not have initial permutation, So one-to-one mapping is applied:
-    initial_mapping = {i: i for i in range(num_qubits)}
-    if report_timeout:
-        mapped_result = MappingResult(
-            circuit=opt_circuit, timed_out=timed_out, initial_mapping=initial_mapping
-        )
-    else:
-        mapped_result = MappingResult(
-            circuit=opt_circuit, initial_mapping=initial_mapping
-        )
-    return mapped_result
+    compute_and_print_costs(
+        circuit,
+        opt_circuit,
+        cnot_minimization=minimization,
+        verbose=options.verbose,
+    )
+    if options.check:
+        equivalence_check(circuit, opt_circuit, None, options)
+
+    return MappingResult(circuit=opt_circuit, timed_out=timed_out)
 
 
 # Optimize cnot circuit given a qasm file:

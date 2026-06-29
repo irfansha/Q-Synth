@@ -1,5 +1,5 @@
 (define (domain Clifford-Synthesis)
-(:requirements :conditional-effects :typing :equality :negative-preconditions)
+(:requirements :conditional-effects :typing :equality :negative-preconditions :action-costs)
 
 (:types row qubit - object)
 
@@ -7,13 +7,21 @@
              (X ?r - row ?c - qubit)
              ; pauli Z matrix element
              (Z ?r - row ?c - qubit)
-)	
+             ; qubits ?a and ?b are connected;
+             ; static predicate
+             (connected ?a ?b - qubit)
+)
+
+(:functions
+  (total-cost) - number
+  (cnot-cost) - number
+)
 
 ;; applying CNOT gate from qubit a to b:
 ;; we only change the proposition that actually change, rest are propagated implicitly:
 (:action cnot
 :parameters (?a ?b - qubit)
-:precondition (and (not (= ?a ?b)))
+:precondition (and (not (= ?a ?b)) (connected ?a ?b))
 :effect       (and
                 ;; x_b = x_a XOR x_b
                 (forall(?r - row) (when (and (X ?r ?a)      (X ?r ?b))  (not (X ?r ?b))))
@@ -21,6 +29,7 @@
                 ;; z_a = z_a XOR z_b
                 (forall(?r - row) (when (and      (Z ?r ?a)  (Z ?r ?b)) (not (Z ?r ?a))))
                 (forall(?r - row) (when (and (not (Z ?r ?a)) (Z ?r ?b))      (Z ?r ?a)))
+                (increase (total-cost) (cnot-cost))
               )
 )
 
@@ -33,6 +42,7 @@
                 ;; z_a = z_a XOR x_a
                 (forall(?r - row) (when (and      (Z ?r ?a)  (X ?r ?a)) (not (Z ?r ?a))))
                 (forall(?r - row) (when (and (not (Z ?r ?a)) (X ?r ?a))      (Z ?r ?a)))
+                (increase (total-cost) 1)
               )
 )
 
@@ -45,6 +55,7 @@
                 ;; x_a swap with z_a
                 (forall(?r - row) (when (and (not(X ?r ?a))    (Z ?r ?a))      (and     (X ?r ?a) (not(Z ?r ?a))) ))
                 (forall(?r - row) (when (and     (X ?r ?a) (not(Z ?r ?a)))     (and (not(X ?r ?a))    (Z ?r ?a))  ))
+                (increase (total-cost) 1)
               )
 )
 

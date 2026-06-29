@@ -1,17 +1,15 @@
 # Irfansha Shaik, Aarhus, 12 July 2023.
-
 # Optimize a circuit by Peephole Optimization with cnot synthesis:
 # - input: an input circuit
 # - output: optimized circuit with cnot slices optimized (reduced CNOT count)
 # - different methods as options to optimize the cnot slices
-
-
+from collections.abc import Callable
 from typing import Optional
-from qiskit import QuantumCircuit, qasm2
+
+from qiskit import QuantumCircuit
 from qsynth.PeepholeSlicing.circuit_utils import CircuitUtils as cu
 from qsynth.PeepholeSlicing.circuit_utils import (
     remove_zero_cost_swaps,
-    equivalence_check_with_map,
     project_circuit,
     project_coupling_graph,
 )
@@ -26,15 +24,20 @@ from qsynth.CliffordSynthesis.clifford_synthesis_sat import (
     clifford_optimization as clifford_opt_sat,
 )
 from qsynth.CliffordSynthesis.circuit_utils import (
+    compare,
     compute_cnot_cost,
     compute_cnot_without_swaps_cost,
     compute_cnot_depth,
-    compute_depth_swaps_as_3cx,
     compute_cnotdepth_swaps_as_3cx,
+    compute_oneq_gate_count,
 )
 from qsynth.LayoutSynthesis.architecture import platform as pt
 from qsynth.CnotSynthesis.options import Options as op
 from qsynth.CnotSynthesis.cnot_synthesis import coupling_graph_check
+from qsynth.Synthesizers.synthesizer import Synthesizer
+from qsynth.ReachabilitySolver.encodings.cnot_rz_synthesis.cnot_rz_synthesis_reachability import \
+    optimize_cnot_rz_circuit_with_reachability_encoding
+from qsynth.Utilities.coupling_graph import CouplingGraph
 from qsynth.Utilities.print_utils import print_stats
 from qsynth.Utilities.result import MappingResult
 
@@ -44,7 +47,7 @@ import time as clock
 
 
 def set_single_slice_timelimit(
-    remaining_time: float, remaining_slices: int, minimum_slice_time: float = 2.0
+        remaining_time: float, remaining_slices: int, minimum_slice_time: float = 2.0
 ) -> float:
     # we divide the remaining time with #slices to get per slice time:
     current_slice_time = remaining_time / (remaining_slices)
@@ -103,12 +106,24 @@ def optimize_single_slice(args, slice, coupling_graph, current_slice_time):
         else:
             print("Choose either a planner, a qbf solver or a sat solver")
             exit(-1)
+    elif args.slicing == "cnot_rz":
+        assert args.sat_solver != None, "CNOT+Rz synthesis is only available with SAT"
+        result = optimize_cnot_rz_circuit_with_reachability_encoding(
+            cur_optimization_slice,
+            qubit_permutation=args.qubit_permute,
+            coupling_graph=cur_coupling_graph,
+            metric=args.minimize,
+            strategy=args.search_strategy,
+            check=args.check,
+            timeout=current_slice_time,
+            intermediate_files_path=args.intermediate_files_path
+        )
     else:
         assert args.slicing == "clifford"
         if args.platform != None:
             # we might need to handle if bidirectional is 2 (via H-CNOT-H):
             assert (
-                args.bidirectional == 1
+                    args.bidirectional == 1
             ), "we assume every platform is bidirectional for clifford synthesis"
 
         if args.planner != None:
@@ -120,7 +135,7 @@ def optimize_single_slice(args, slice, coupling_graph, current_slice_time):
                 planner=args.planner,
                 encoding=args.encoding,
                 time=current_slice_time,
-                cnot_minimization=args.minimize,
+                # cnot_minimization=args.minimize, TODO: needs to be handled in planning: for now encoding already specifies the optimization criteria
                 verbose=args.verbose,
                 coupling_graph=cur_coupling_graph,
                 check=args.check,
@@ -146,7 +161,6 @@ def optimize_single_slice(args, slice, coupling_graph, current_slice_time):
                 qubit_permute=args.qubit_permute,
                 intermediate_files_path=args.intermediate_files_path,
                 check=args.check,
-                report_timeout=True,
             )
     return result.circuit, result.timed_out
 
@@ -167,30 +181,22 @@ def replace_optimized_slice(args, slice, cur_opt_circuit, num_qubits):
             cur_opt_circuit = project_circuit(
                 cur_opt_circuit, slice.reverse_projection_map, num_qubits
             )
-        initial_cx_gates = cnot_cost(slice.optimization_slice)
-        final_cx_gates = cnot_cost(cur_opt_circuit)
-        initial_cx_depth = cnot_depth(slice.optimization_slice)
-        final_cx_depth = cnot_depth(cur_opt_circuit)
         if args.verbose > 0:
             print_stats(slice.optimization_slice, cur_opt_circuit)
-        if args.minimize == "cx-depth":
-            if (final_cx_depth < initial_cx_depth) or (
-                final_cx_depth == initial_cx_depth
-                and (final_cx_gates < initial_cx_gates)
-            ):
-                # updating the existing slice with optimal one:
+        if args.minimize == "cx-depth" or args.minimize == "bounded_cx-count_local_cx-depth":
+            # priority: cx-depth first, then cx-count, then 1q-gate count:
+            if compare(slice.optimization_slice, cur_opt_circuit,
+                       [cnot_depth, cnot_cost, compute_oneq_gate_count]) == 1:
+                slice.optimization_slice = cur_opt_circuit
+        elif args.minimize == "cx-count" or args.minimize == "bounded_cx-depth_local_cx-count":
+            # priority: cx-count first, then cx-depth, then 1q-gate count:
+            if compare(slice.optimization_slice, cur_opt_circuit,
+                       [cnot_cost, cnot_depth, compute_oneq_gate_count]) == 1:
                 slice.optimization_slice = cur_opt_circuit
         else:
-            assert (
-                args.minimize == "cx-count"
-                or args.minimize == "bounded_cx-depth_local_cx-count"
-                or args.minimize == "bounded_cx-count_local_cx-depth"
-            )
-            if (final_cx_gates < initial_cx_gates) or (
-                final_cx_gates == initial_cx_gates
-                and (final_cx_depth < initial_cx_depth)
-            ):
-                # updating the existing slice with optimal one:
+            assert args.minimize == "gate-count"
+            # priority: total gate count first, then cx-count, then cx-depth:
+            if compare(slice.optimization_slice, cur_opt_circuit, [lambda qc: qc.size(), cnot_cost, cnot_depth]) == 1:
                 slice.optimization_slice = cur_opt_circuit
     else:
         # nothing improved:
@@ -199,34 +205,31 @@ def replace_optimized_slice(args, slice, cur_opt_circuit, num_qubits):
 
 
 def peephole_synthesis(
-    circuit_in=None,
-    circuit_out=None,
-    encoding="simpleaux",
-    slicing="cnot",
-    minimize="cx-count",
-    model="sat",
-    qubit_permute=None,
-    gate_ordering=None,
-    simple_path_restrictions=None,
-    cycle_bound=3,
-    disable_unused=True,
-    search_strategy="forward",
-    solver=None,
-    nthreads=1,
-    time=600,
-    platform=None,
-    bidirectional=1,
-    intermediate_files_path="./intermediate_files",
-    verbose=0,
-    check=0,
-    coupling_graph=None,
-) -> Optional[QuantumCircuit]:
-
+        circuit_in=None,
+        encoding="simpleaux",
+        slicing="cnot",
+        minimize="cx-count",
+        model="sat",
+        qubit_permute=None,
+        gate_ordering=None,
+        simple_path_restrictions=None,
+        cycle_bound=3,
+        disable_unused=True,
+        search_strategy="forward",
+        solver=None,
+        nthreads=1,
+        time=600,
+        platform=None,
+        bidirectional=1,
+        intermediate_files_path="./intermediate_files",
+        verbose=0,
+        check=0,
+        coupling_graph=None,
+) -> MappingResult:
     # TODO: add descriptions of arguments:
     # --------------------------------------- Creating args separately ---------------------------------------
     args = op()
     args.circuit_in = circuit_in
-    args.circuit_out = circuit_out
     args.encoding = encoding
     args.slicing = slicing
     args.verbose = verbose
@@ -262,7 +265,7 @@ def peephole_synthesis(
     # if coupling graph is given, we assume it is a custom one:
     elif coupling_graph != None:
         assert (
-            args.platform == None
+                args.platform == None
         ), "If coupling graph is given, platform should not be chosen"
         coupling_graph = pt(
             platform="custom",
@@ -285,7 +288,7 @@ def peephole_synthesis(
             args.planner = args.solver
     elif args.model == "qbf":
         assert (
-            args.slicing == "cnot"
+                args.slicing == "cnot"
         ), "clifford synthesis only available with sat encoding, please use a sat solver"
         if args.solver == None:
             args.qbf_solver = "caqe"
@@ -305,7 +308,7 @@ def peephole_synthesis(
     # if qubit permutation is chosen, we assume it is only for sat:
     if args.qubit_permute:
         assert (
-            args.sat_solver != None
+                args.sat_solver != None
         ), "qubit permutation only available with sat encoding, please use a sat solver or turnoff the permutation option"
 
     start_time = clock.perf_counter()
@@ -323,19 +326,19 @@ def peephole_synthesis(
     # Copy of original circuit:
     circuit_copy = circuit.copy()
     # slicing for CNOT/Clifford synthesis:
-    sliced_circuit = cu(circuit_copy, args.slicing, args.check)
+    sliced_circuit = cu(circuit_copy, args.slicing)
 
     total_slices = len(sliced_circuit.slices)
     if args.platform != None:
         if args.slicing == "clifford":
             assert (
-                args.qubit_permute == False
+                    args.qubit_permute == False
             ), "For now, we do not allow qubit permutation with layout aware (W+R) in clifford synthesis"
         else:
-            assert args.slicing == "cnot"
+            assert args.slicing in ["cnot", "cnot_rz"]
             if args.qubit_permute:
                 assert (
-                    total_slices == 1
+                        total_slices == 1
                 ), "We only handle W+R if the circuit has a single slice"
 
     # set right cost functions based on permutation enabling chosen:
@@ -350,9 +353,9 @@ def peephole_synthesis(
     # first with less used qubits and then with cnot count or depth according to the minimization criteria:
     slices_order = list(range(len(sliced_circuit.slices)))
     if (
-        args.minimize == "cx-depth"
-        or args.minimize == "bounded_cx-depth_local_cx-count"
-        or args.minimize == "bounded_cx-count_local_cx-depth"
+            args.minimize == "cx-depth"
+            or args.minimize == "bounded_cx-depth_local_cx-count"
+            or args.minimize == "bounded_cx-count_local_cx-depth"
     ):
         # for local CNOT count optimization, the hardness is still determined by the scene or depth of the slice:
         # we prioritize depth before cnot count:
@@ -365,7 +368,7 @@ def peephole_synthesis(
             ),
         )
     else:
-        assert args.minimize == "cx-count"
+        assert args.minimize == "cx-count" or args.minimize == "gate-count"
         # we prioritize count before cnot depth:
         sorted_slices_order = sorted(
             slices_order,
@@ -393,7 +396,7 @@ def peephole_synthesis(
         max_num_characters_in_slice_number = len(str(total_slices))
         if args.verbose >= 0:
             print(
-                f"({str(current_slice_count).rjust(max_num_characters_in_slice_number)}/{total_slices}) solving slice {str(slice_id+1).rjust(max_num_characters_in_slice_number)} with {round(current_slice_time,2)}s timelimit"
+                f"({str(current_slice_count).rjust(max_num_characters_in_slice_number)}/{total_slices}) solving slice {str(slice_id + 1).rjust(max_num_characters_in_slice_number)} with {round(current_slice_time, 2)}s timelimit"
             )
             # print(slice.optimization_slice)
         # optimize and add the optimization slice:
@@ -423,6 +426,7 @@ def peephole_synthesis(
             num_qubits=num_qubits,
         )
 
+    timed_out = False
     number_of_timedout_slices = len(timed_out_slices)
     if number_of_timedout_slices > 0:
         if args.verbose >= 0:
@@ -432,6 +436,7 @@ def peephole_synthesis(
         current_slice_count = 0
         for timed_out_slice_id in timed_out_slices:
             if args.remaining_time < 0.001:
+                timed_out = True
                 if args.verbose >= 0:
                     print("Timed out, remaining time less than 0.001s")
                 break
@@ -440,7 +445,7 @@ def peephole_synthesis(
             num_spaces = len(str(number_of_timedout_slices))
             if args.verbose >= 0:
                 print(
-                    f"({str(current_slice_count).rjust(num_spaces)}/{number_of_timedout_slices}) solving timedout slice {str(timed_out_slice_id+1).rjust(num_spaces)} with {round(args.remaining_time,2)}s timelimit"
+                    f"({str(current_slice_count).rjust(num_spaces)}/{number_of_timedout_slices}) solving timedout slice {str(timed_out_slice_id + 1).rjust(num_spaces)} with {round(args.remaining_time, 2)}s timelimit"
                 )
             slice = sliced_circuit.slices[timed_out_slice_id]
             start_run_time = clock.perf_counter()
@@ -465,16 +470,13 @@ def peephole_synthesis(
         opt_circuit = opt_circuit.compose(slice.non_optimization_slice)
         opt_circuit = opt_circuit.compose(slice.optimization_slice)
 
-    # We do not have initial permutation, So one-to-one mapping is applied:
-    initial_mapping = {i: i for i in range(num_qubits)}
-
     if args.qubit_permute:
         # we remove zero-cost swaps, mapping can change with swap removal:
         opt_circuit, post_mapping = remove_zero_cost_swaps(opt_circuit, num_qubits)
         result = MappingResult(
             circuit=opt_circuit,
-            initial_mapping=initial_mapping,
             final_mapping=post_mapping,
+            timed_out=timed_out,
         )
         if args.verbose > 1:
             print("\nOptimized Circuit:")
@@ -483,19 +485,8 @@ def peephole_synthesis(
                 "\nQubit permutation dictionary to be applied on original measurements:"
             )
             print(post_mapping)
-        # checking equivalence using the post mapping:
-        if args.check:
-            print(
-                "\nChecking Equivalence between original (without measurements) and permuted optimized circuit"
-            )
-            equivalence_check_with_map(
-                sliced_circuit.measurementless_circuit,
-                opt_circuit,
-                post_mapping,
-                verbose=args.verbose,
-            )
     else:
-        result = MappingResult(circuit=opt_circuit, initial_mapping=initial_mapping)
+        result = MappingResult(circuit=opt_circuit, timed_out=timed_out)
         if args.verbose > 1:
             print("\nOptimized Circuit:")
             print(opt_circuit)
@@ -505,7 +496,191 @@ def peephole_synthesis(
         print(f"Time taken: {total_time}")
         print("Full circuit stats:")
         print_stats(circuit, result.circuit)
-    if args.circuit_out != None:
-        qasm2.dump(result.circuit, args.circuit_out)
 
+    return result
+
+
+def peephole_synthesis_general(
+        circuit: QuantumCircuit,
+        synthesizer: Synthesizer,
+        slicing: str,
+        slice_hardness: Callable[[QuantumCircuit], tuple],
+        slice_quality: Callable[[QuantumCircuit], tuple],
+        timeout: int,
+        output_qubit_permute: bool,
+        coupling_graph: Optional[CouplingGraph],
+        verbose: int = -1,
+) -> MappingResult:
+    """
+    Slices the circuit into subcircuits according to the "slicing" argument, and optimizes each subcircuit with the
+    provided synthesizer function. Assumes that slices can be synthesized independently, so synthesis that both allows
+    output qubit permutation and coupling graph restrictions (W+R) is not supported.
+    Args:
+        circuit (QuantumCircuit): The quantum circuit to synthesize.
+        synthesizer: A Synthesizer object used to synthesize each subcircuit.
+        slicing: Decides what gate set to slice the circuit for. Options are "cnot", "cnot_rz", and "clifford".
+        slice_hardness: A cost function used to determine the order in which to solve the slices (low to high).
+        slice_quality: A cost function used to determine if an optimized slice is better than the original slice
+            (lower is better).
+        timeout: The total timeout for the peephole synthesis.
+        output_qubit_permute:
+        coupling_graph (Optional[CouplingGraph]): The (optional) coupling graph on which to synthesize the quantum circuit.
+        verbose (int, optional): The verbosity level for logging. Higher values produce more detailed
+            output. Options are -1 to 3 (included). Defaults to -1 (silent).
+    Returns:
+        MappingResult containing the optimized circuit, initial and final mappings, and booleans indicating whether
+        the synthesis succeeded, timed out or failed.
+    """
+    start_time = clock.perf_counter()
+    if verbose > 1:
+        print("\nOriginal Circuit:")
+        print(circuit)
+
+    circuit_copy = circuit.copy()
+    sliced_circuit = cu(circuit_copy, slicing)
+
+    total_slices = len(sliced_circuit.slices)
+
+    # Sorting slices to prioritize easy slices first,
+    slices_order = list(range(len(sliced_circuit.slices)))
+    sorted_slices_order = sorted(
+        slices_order,
+        key=lambda k: slice_hardness(sliced_circuit.slices[k].optimization_slice)
+    )
+
+    remaining_time = timeout
+    current_slice_count = 0
+    timed_out_slices = []
+    for slice_id in sorted_slices_order:
+        current_slice_time = set_single_slice_timelimit(
+            remaining_time=remaining_time,
+            remaining_slices=(total_slices - current_slice_count),
+        )
+        if remaining_time < 0.001:
+            print("Timed out, remaining time less than 0.001s")
+            break
+        current_slice_count += 1
+        slice = sliced_circuit.slices[slice_id]
+        max_num_characters_in_slice_number = len(str(total_slices))
+        if verbose >= 0:
+            print(
+                f"({str(current_slice_count).rjust(max_num_characters_in_slice_number)}/{total_slices}) solving slice {str(slice_id + 1).rjust(max_num_characters_in_slice_number)} with {round(current_slice_time, 2)}s timelimit"
+            )
+
+        # Skip if slice is empty
+        if len(slice.optimization_slice.data) == 0:
+            continue
+        # Run synthesis
+        start_run_time = clock.perf_counter()
+
+        result = synthesizer.run(slice.optimization_slice, coupling_graph, current_slice_time)
+
+        if result.timed_out:
+            timed_out_slices.append(slice_id)
+
+        solving_time = clock.perf_counter() - start_run_time
+        remaining_time = remaining_time - solving_time
+
+        # Replace slice if optimized is better
+        if slice_quality(result.circuit) < slice_quality(slice.optimization_slice):
+            slice.optimization_slice = result.circuit
+
+    timed_out = False
+    number_of_timedout_slices = len(timed_out_slices)
+    if number_of_timedout_slices > 0 and verbose >= 0:
+        print(
+            f"Running {number_of_timedout_slices} timed-out slices with remaining time"
+        )
+    current_slice_count = 0
+    for timed_out_slice_id in timed_out_slices:
+        if remaining_time < 0.001:
+            timed_out = True
+            if verbose >= 0:
+                print("Timed out, remaining time less than 0.001s")
+            break
+        current_slice_count += 1
+        # number of spaces needed for printing the slice number:
+        num_spaces = len(str(number_of_timedout_slices))
+        if verbose >= 0:
+            print(
+                f"({str(current_slice_count).rjust(num_spaces)}/{number_of_timedout_slices}) solving timedout slice {str(timed_out_slice_id + 1).rjust(num_spaces)} with {round(remaining_time, 2)}s timelimit"
+            )
+        slice = sliced_circuit.slices[timed_out_slice_id]
+
+        # Run synthesis
+        start_run_time = clock.perf_counter()
+
+        result = synthesizer.run(slice.optimization_slice, coupling_graph, remaining_time)
+
+        if result.timed_out:
+            timed_out_slices.append(timed_out_slice_id)
+
+        solving_time = clock.perf_counter() - start_run_time
+        remaining_time = remaining_time - solving_time
+
+        # Replace slice if optimized is better
+        if slice_quality(result.circuit) < slice_quality(slice.optimization_slice):
+            slice.optimization_slice = result.circuit
+
+    # Composing optimized circuit from slices:
+    opt_circuit = QuantumCircuit(circuit.num_qubits)
+    for slice in sliced_circuit.slices:
+        opt_circuit.compose(slice.non_optimization_slice, inplace=True)
+        opt_circuit.compose(slice.optimization_slice, inplace=True)
+
+    if output_qubit_permute:
+        # we remove zero-cost swaps, mapping can change with swap removal:
+        opt_circuit, post_mapping = remove_zero_cost_swaps(opt_circuit, circuit.num_qubits)
+        result = MappingResult(
+            circuit=opt_circuit,
+            final_mapping=post_mapping,
+            timed_out=timed_out,
+        )
+        #if verbose > 1:
+        #    print("\nOptimized Circuit:")
+        #    print(opt_circuit)
+        #    print(
+        #        "\nQubit permutation dictionary to be applied on original measurements:"
+        #    )
+        #    print(post_mapping)
+    else:
+        result = MappingResult(circuit=opt_circuit, timed_out=timed_out)
+        #if verbose > 1:
+        #    print("\nOptimized Circuit:")
+        #    print(opt_circuit)
+
+    total_time = clock.perf_counter() - start_time
+    if verbose >= 0:
+        print(f"Time taken: {total_time:.2f}")
+        #print("Full circuit stats:")
+        #print_stats(circuit, result.circuit)
+
+    return result
+
+
+def peephole_synthesis_1q_rewrite(circuit: QuantumCircuit, use_cz_gate: bool = False) -> MappingResult:
+    from qsynth.CliffordSynthesis.clifford_1q_resynthesis import (
+        clifford_1q_optimization_greedy,
+    )
+    # Copy of original circuit:
+    circuit_copy = circuit.copy()
+    # slicing for CNOT/Clifford synthesis:
+    sliced_circuit = cu(circuit=circuit_copy, slice_type="clifford")
+    for slice in sliced_circuit.slices:
+        optimized_slice = clifford_1q_optimization_greedy(
+            slice.optimization_slice, use_cz_gate=use_cz_gate
+        )
+        slice.optimization_slice = optimized_slice
+
+    # composing optimal circuit with optimized circuits:
+    opt_circuit = QuantumCircuit(len(circuit_copy.qubits))
+    for slice in sliced_circuit.slices:
+        opt_circuit = opt_circuit.compose(slice.non_optimization_slice)
+        opt_circuit = opt_circuit.compose(slice.optimization_slice)
+    # We do not have initial permutation, So one-to-one mapping is applied:
+    initial_mapping = {i: i for i in range(len(circuit_copy.qubits))}
+    # We do not have qubit permutation here:
+    final_mapping = {i: i for i in range(len(circuit_copy.qubits))}
+
+    result = MappingResult(circuit=opt_circuit, initial_mapping=initial_mapping, final_mapping=final_mapping)
     return result

@@ -23,7 +23,6 @@ To upload a new version to PyPI, run the following commands:
     source upload_venv/bin/activate
 
     pip install -e .
-    pytest -v .
 
     python3 -m pip install --upgrade build
     python3 -m pip install --upgrade twine
@@ -46,3 +45,40 @@ The above commands:
 - delete the virtual environment and build artifacts
 
 Note: You need to have an account on PyPI and be added as a maintainer for the Q-Synth package.
+
+For installing from PyPI, use the following command (for stable version):
+
+    python3 -m pip install Q-Synth
+
+For installing from PyPI, use the following command (for beta version):
+
+    python3 -m pip install --pre Q-Synth
+
+## Upload new version to TestPyPI:
+
+Only a single line needs to be changed in the above commands to upload to TestPyPI instead of PyPI:
+
+    python3 -m venv upload_venv
+    source upload_venv/bin/activate
+
+    pip install -e .
+
+    python3 -m pip install --upgrade build
+    python3 -m pip install --upgrade twine
+    python3 -m build --sdist
+    python3 -m build --wheel
+    twine upload --repository testpypi dist/*
+
+    deactivate
+    rm -rf upload_venv/
+    rm -rf dist/
+    rm -rf build/
+    rm -rf src/*.egg-info
+
+For installing from TestPyPI, use the following command (for stable version):
+
+python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple Q-Synth
+
+For installing from TestPyPI, use the following command (for beta version):
+
+    python3 -m pip install --pre -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple Q-Synth

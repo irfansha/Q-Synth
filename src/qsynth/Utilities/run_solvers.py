@@ -1,4 +1,4 @@
-import os, subprocess
+import os, subprocess, sys
 from pathlib import Path
 
 
@@ -33,39 +33,36 @@ class RunSolvers:
 
     def run_caqe(self):
 
-        if self.options.preprocessor == "bloqqer":
-            if os.system("bloqqer -h >" + os.devnull) != 0:
-                print(
-                    f"Error: preprocessor {self.options.preprocessor} requires executable bloqqer on the path"
-                )
-                exit(-1)
-            preprocessing_command = (
-                "bloqqer --timeout=100 "
-                + self.options.qdimacs_out
-                + " > "
-                + self.options.preprocessor_out
+        # QBF instances are always preprocessed with bloqqer before solving with caqe.
+        if os.system("bloqqer -h >" + os.devnull) != 0:
+            print(
+                "Error: QBF preprocessing requires executable bloqqer on the path"
             )
-            if self.options.verbose > 1:
-                print(preprocessing_command)
-            os.system(preprocessing_command)
+            exit(-1)
+        preprocessing_command = (
+            "bloqqer --timeout=100 "
+            + self.options.qdimacs_out
+            + " > "
+            + self.options.preprocessor_out
+        )
+        if self.options.verbose > 1:
+            print(preprocessing_command)
+        os.system(preprocessing_command)
 
-            # if preprocessor solves the instance directly and its a sat instance, we run the solver directly on original instance for plan extraction:
-            with open(self.options.preprocessor_out) as f:
-                lines = f.readlines()
-                header = lines[0].strip("\n")
-                num_clauses = int(header.split(" ")[-1])
-                if num_clauses == 0:
-                    self.options.preprocessor_out = self.options.qdimacs_out
+        # if preprocessor solves the instance directly and its a sat instance, we run the solver directly on original instance for plan extraction:
+        with open(self.options.preprocessor_out) as f:
+            lines = f.readlines()
+            header = lines[0].strip("\n")
+            num_clauses = int(header.split(" ")[-1])
+            if num_clauses == 0:
+                self.options.preprocessor_out = self.options.qdimacs_out
         if os.system("caqe -h >" + os.devnull) != 0:
             print(
                 f"Error: solver {self.options.solver} requires executable caqe on the path"
             )
             exit(-1)
-        # Handle is preprocessor already solves the instance:
-        if self.options.preprocessor != "None":
-            command = "caqe --qdo " + self.options.preprocessor_out
-        else:
-            command = "caqe --qdo " + self.options.qdimacs_out
+        # caqe always runs on the bloqqer-preprocessed instance:
+        command = "caqe --qdo " + self.options.preprocessor_out
         if self.options.verbose > 1:
             print(command)
         self.run_command(command, output_file=self.options.solver_out)
@@ -104,7 +101,8 @@ class RunSolvers:
         utilities_path = Path(run_solvers_path).parent
         run_pysat_solver_path = os.path.join(utilities_path, "run_pysat_solver.py")
         command = (
-            "python3 "
+            sys.executable
+            + " "
             + run_pysat_solver_path
             + " --cnf "
             + self.options.dimacs_out

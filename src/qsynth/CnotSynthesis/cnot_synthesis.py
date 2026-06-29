@@ -159,15 +159,15 @@ def cnot_optimization(
     num_qubits = len(circuit.qubits)
 
     _, opt_circuit, qubit_map = cnot_synth_main(matrix, options, num_qubits)
+
+    if opt_circuit is None:
+        return MappingResult(circuit=circuit, no_plan_found=True)
+
     # if opt circuit in not None, then we compute costs and check equivalence:
-    if opt_circuit != None:
-        compute_and_print_costs(circuit, opt_circuit, verbose=verbose)
-        # equivalence_check(circuit, opt_circuit, qubit_map, options)
-    # We do not have initial permutation, So one-to-one mapping is applied:
-    initial_mapping = {i: i for i in range(num_qubits)}
-    mapped_result = MappingResult(
-        circuit=opt_circuit, initial_mapping=initial_mapping, final_mapping=qubit_map
-    )
+    compute_and_print_costs(circuit, opt_circuit, verbose=verbose)
+    # equivalence_check(circuit, opt_circuit, qubit_map, options)
+    mapped_result = MappingResult(circuit=opt_circuit)
+
     return mapped_result
 
 

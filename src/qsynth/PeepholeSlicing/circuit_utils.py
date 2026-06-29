@@ -1,13 +1,17 @@
 # Irfansha Shaik, Aarhus, 05 January 2023.
-
-from qiskit import QuantumCircuit
+from mqt import qcec
+from qiskit import QuantumCircuit, ClassicalRegister, qasm2, QuantumRegister
 from qiskit.circuit import Gate
+from qiskit.quantum_info import Clifford, Operator
+
 from qsynth.PeepholeSlicing.circuit_slice import CircuitSlice as cs
 from qsynth.LayoutSynthesis.circuit_utils import (
     gate_get_qubit,
     gate_set_qubits,
     gate_set_qubit,
 )
+from qsynth.ReachabilitySolver.encodings.cnot_synthesis.cnot_reachability_utils import add_trailing_swaps, \
+    get_used_qubits
 from qsynth.Utilities.slices import get_slices
 import numpy
 
@@ -38,9 +42,102 @@ def separate_measurements(circuit, num_qubits, clbits):
     return circuit, circuit_measurements
 
 
-def equivalence_check_with_map(org_circuit, opt_circuit, qubit_map, verbose=False):
+def check_equivalence_of_clifford_circuits(org_circuit: QuantumCircuit,
+                                           opt_circuit: QuantumCircuit,
+                                           qubit_mapping: dict[int, int],
+                                           verbose: int = 0):
+    """
+    Assumes both input circuits are Clifford circuits. Checks equivalence of Clifford matrices while considering the
+    given qubit map from qubits in org_circuit to qubits in opt_circuit.
+    Raises:
+        AssertionError: if org_circuit is not equal to opt_circuit
+    """
+    opt_circuit_copy = opt_circuit.copy()
+    add_trailing_swaps(opt_circuit_copy, qubit_mapping)
+    org_clifford_matrix = Clifford(org_circuit)
+    opt_clifford_matrix = Clifford(opt_circuit_copy)
+    assert org_clifford_matrix == opt_clifford_matrix, "Optimized circuit is not equivalent to original circuit"
     if verbose > 0:
-        print("Currently, equivalence checking is not supported")
+        print("Optimized circuit is equivalent to the original circuit")
+
+
+def check_equivalence_of_arbitrary_circuits(org_circuit: QuantumCircuit,
+                                           opt_circuit: QuantumCircuit,
+                                           final_mapping: dict[int, int],
+                                           initial_mapping: dict[int, int] = None,
+                                           verbose: int = 0):
+    """
+    Checks equivalence of org_circuit and opt_circuit with QCEC while considering the given initial and final mappings.
+    Raises:
+        AssertionError: if org_circuit is not equal to opt_circuit.
+    """
+    # Strip all classical registers instead of just removing final measurements.
+    # remove_final_measurements() leaves orphaned empty registers behind, which
+    # causes QCEC to crash when we later add our own measurement register.
+    org_circuit = _strip_classical_registers(org_circuit)
+    opt_circuit = _strip_classical_registers(opt_circuit)
+    org_circuit.measure_all()
+    # Measure only qubits mapping to logical qubits
+    opt_circuit.add_register(ClassicalRegister(len(final_mapping), name="meas"))
+    opt_circuit.barrier(opt_circuit.qubits)
+    for logical_qubit, physical_qubit in final_mapping.items():
+        opt_circuit.measure(physical_qubit, logical_qubit)
+
+    # If an initial mapping is given, we relabel all qubit inputs according to the mapping
+    if initial_mapping is not None:
+        # Make initial mapping complete for all used qubits by mapping unmapped qubits to ancilla positions
+        initial_mapping_physical_to_logical = { v: k for k, v in initial_mapping.items() }
+        used_qubits = get_used_qubits(opt_circuit)
+        free_ancilla_index = org_circuit.num_qubits
+        for qubit in range(opt_circuit.num_qubits):
+            if qubit not in initial_mapping_physical_to_logical and qubit in used_qubits:
+                initial_mapping_physical_to_logical[qubit] = free_ancilla_index
+                free_ancilla_index += 1
+        # Get circuit relabeled according to mapping and with unused qubits removed
+        opt_circuit = get_relabeled_quantum_circuit(
+            opt_circuit,
+            initial_mapping_physical_to_logical
+        )
+
+    equivalence_result = qcec.verify(org_circuit, opt_circuit, check_partial_equivalence=True)
+    equivalent = equivalence_result.considered_equivalent()
+    if not equivalent:
+        raise AssertionError("Optimized circuit is not equivalent to original circuit")
+    if verbose > 0:
+        print("Optimized circuit is equivalent to the original circuit")
+
+
+def get_relabeled_quantum_circuit(circuit, initial_mapping):
+    """
+    Relabels all gates according to the initial mapping dictionary. Assumes the initial mapping contains a mapping for
+    every used qubit in the circuit. The relabeled circuit will only include the qubits present in the initial_mapping.
+    """
+    number_of_used_qubits = len(initial_mapping)
+    relabeled_circuit = QuantumCircuit(QuantumRegister(number_of_used_qubits), *circuit.cregs)
+    for operation, qargs, cargs in circuit.data:
+        if operation.name == "barrier":
+            relabeled_circuit.barrier()
+            continue
+        qubits = [circuit.find_bit(q).index for q in qargs]
+        classical_bits = [circuit.find_bit(c).index for c in cargs]
+        relabeled_qubits = [initial_mapping[q] for q in qubits]
+        relabeled_circuit.append(operation, relabeled_qubits, classical_bits)
+    return relabeled_circuit
+
+
+def _strip_classical_registers(circuit: QuantumCircuit) -> QuantumCircuit:
+    """
+    Returns a new circuit with all classical registers and bits removed,
+    keeping only the quantum registers and gates intact.
+    """
+    # Build a new circuit with only the quantum registers
+    new_circuit = QuantumCircuit(*circuit.qregs)
+    for instruction in circuit.data:
+        # Skip any instruction that references classical bits (e.g. measure, if_else)
+        if instruction.clbits:
+            continue
+        new_circuit.append(instruction)
+    return new_circuit
 
 
 # given a cnot circuit with zero cost swaps, we remove the swaps
@@ -88,11 +185,11 @@ def is_multiple_of_piby2(param: float) -> bool:
     return ((param * 2) / numpy.pi).is_integer()
 
 
-def is_cnot(gate: Gate) -> bool:
-    return gate.operation.name in ["cx", "swap"]
+def is_cnot_gate(gate: Gate) -> bool:
+    return gate.name in ["cx", "swap"]
 
 
-def is_clifford(gate: Gate) -> bool:
+def is_clifford_gate(gate) -> bool:
     clifford_gates = [
         "x",
         "y",
@@ -108,10 +205,9 @@ def is_clifford(gate: Gate) -> bool:
         "cz",
         "cy",
     ]
-    if gate.operation.name in clifford_gates:
+    if gate.name in clifford_gates:
         return True
-    elif gate.operation.name in ["u", "u1", "u2", "u3", "rx", "ry", "rz"]:
-        is_clifford_gate = True
+    elif gate.name in ["u", "u1", "u2", "u3", "rx", "ry", "rz"]:
         for param in gate.params:
             # check if param is a multiple of pi/2:
             if not is_multiple_of_piby2(param=param):
@@ -119,6 +215,25 @@ def is_clifford(gate: Gate) -> bool:
         return True
     else:
         return False
+
+
+def is_cnot_rz_gate(gate) -> bool:
+    return gate.name in ["cx", "swap", "rz", "z", "s", "sdg", "t", "tdg"]
+
+
+def is_clifford_circuit(circuit: QuantumCircuit) -> bool:
+    for gate in circuit:
+        if not is_clifford_gate(gate):
+            return False
+    return True
+
+
+def is_cnot_circuit(circuit: QuantumCircuit) -> bool:
+    return all(is_cnot_gate(gate) for gate in circuit)
+
+
+def is_cnot_rz_circuit(circuit: QuantumCircuit) -> bool:
+    return all(is_cnot_rz_gate(gate) for gate in circuit)
 
 
 def project_circuit(
@@ -175,7 +290,7 @@ class CircuitUtils:
             # print(used_qubits)
 
     # Parses domain and problem file:
-    def __init__(self, circuit, slice_type, check, verbose=False):
+    def __init__(self, circuit, slice_type):
         self.circuit = circuit
         # if we have classical bits in original circuit, then we use it in the optimized circuit:
         if len(self.circuit.clbits) == 0:
@@ -190,10 +305,12 @@ class CircuitUtils:
         self.slices = []
         # adding appropriate predicate:
         if slice_type == "cnot":
-            is_valid = is_cnot
+            is_valid = is_cnot_gate
+        elif slice_type == "cnot_rz":
+            is_valid = is_cnot_rz_gate
         else:
             assert slice_type == "clifford"
-            is_valid = is_clifford
+            is_valid = is_clifford_gate
         current_slice_index = 0
         for non_opt, opt in get_slices(self.circuit, is_valid):
             slice = cs()
@@ -209,6 +326,3 @@ class CircuitUtils:
             current_slice_index = current_slice_index + 1
             self.slices.append(slice)
         self.compute_unused_qubits()
-        # checking equivalence:
-        if check and verbose > 0:
-            print("Currently, equivalence checking is not supported")

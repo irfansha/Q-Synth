@@ -11,10 +11,18 @@ from .subarchitecture_synthesis import (
 )
 
 from qiskit import QuantumCircuit, QuantumRegister
-from qsynth.LayoutSynthesis.architecture import platform as parse_platform
 
 from qsynth.Utilities.result import MappingResult
 from qiskit.circuit.library import CXGate
+
+from ..CliffordSynthesis.circuit_utils import compute_cnot_cost, compute_cnotdepth_swaps_as_3cx, \
+    compute_depth_swaps_as_3cx
+from ..layout_synthesis_wrapper import layout_synthesis_wrapper as layout_synthesis_wrapper
+
+
+def get_cx_count(circuit: QuantumCircuit) -> int:
+    return circuit.count_ops().get("cx", 0)
+
 
 def get_swap_count(circuit: QuantumCircuit) -> int:
     ops = circuit.count_ops()
@@ -56,6 +64,22 @@ def get_opt_metric_desc(metric: str) -> str:
             raise ValueError(f"Unexpected metric: {metric}")
 
 
+def get_opt_val_from_metric(circuit: QuantumCircuit, metric: str) -> int:
+    match (metric):
+        case "cx-count":
+            return compute_cnot_cost(circuit)
+        case "cx-depth":
+            return compute_cnotdepth_swaps_as_3cx(circuit)
+        case "depth":
+            return compute_depth_swaps_as_3cx(circuit)
+        case "depth_cx-count":
+            return compute_depth_swaps_as_3cx(circuit)
+        case "cx-depth_cx-count":
+            return compute_cnotdepth_swaps_as_3cx(circuit)
+        case _:
+            raise ValueError(f"Unexpected metric: {metric}")
+
+
 def select_optimal_among_best(
     metric: str, solutions: list[MappingSolution]
 ) -> MappingSolution:
@@ -73,70 +97,31 @@ def select_optimal_among_best(
                 if get_cx_count(solution.circuit) < get_cx_count(best.circuit):
                     best = solution
             return best
+        case _:
+            raise ValueError(f"Unexpected metric: {metric}")
 
 
 def subarchitecture_mapping(
-    circuit_in=None,
-    circuit_out=None,
-    platform=None,
-    model="sat",
-    solver=None,
-    solver_time=1800,
-    num_ancillary_qubits=0,
-    relaxed=0,
-    bidirectional=1,
-    bridge=0,
-    start=0,
-    step=1,
-    end=None,
-    verbose=0,
-    cnot_cancel=0,
-    cardinality=1,
-    parallel_swaps=0,
-    aux_files="./intermediate_files",
-    check=0,
-    metric="cx-count",
-    layout_synthesis_method=None,
-    coupling_graph=None,
-) -> Optional[tuple[QuantumCircuit, int]]:
+    circuit: QuantumCircuit,
+    coupling_graph: list[list[int]],
+    metric: str,
+    parallel_swaps: bool,
+    num_ancillary_qubits: int,
+    search_strategy: str,
+    swap_upper_bound: Optional[int],
+    relaxed_dependencies: bool,
+    cancel_cnots: bool,
+    allow_bridges: bool,
+    model: str,
+    solver: Optional[str],
+    intermediate_files_path: str,
+    timeout: int,
+    verbose: int,
+) -> MappingResult:
 
-    # Layout synthesis tool injection is required
-    if layout_synthesis_method is None:
-        if verbose > -1:
-            print("Error: Layout synthesis tool is not supplied.")
-        return
+    input_circuit = circuit
 
-    # Assume a bidirectional platform
-    if not bidirectional == 1:
-        if verbose > -1:
-            print("Error: Subarchitectures assume a bidirectional platform.")
-        return
-
-    # Step size 1 required for progressive bounding
-    if not step == 1:
-        if verbose > -1:
-            print("Error: Subarchitectures assume a step size of 1.")
-        return
-
-    input_circuit = circuit_in
-
-    # if platform is chosen then coupling graph is extracted:
-    if coupling_graph == None and platform != None:
-        (coupling_graph, _, _, _, _, num_physical_qubits) = parse_platform(
-            platform=platform,
-            bidirectional=bidirectional,
-            coupling_graph=None,
-        )
-    # if coupling graph is given, we assume it is a custom one:
-    elif coupling_graph != None:
-        assert (
-            platform == None
-        ), "If coupling graph is given, platform should not be chosen"
-        (coupling_graph, _, _, _, _, num_physical_qubits) = parse_platform(
-            platform="custom",
-            bidirectional=bidirectional,
-            coupling_graph=coupling_graph,
-        )
+    num_physical_qubits = max(max(q1, q2) for q1, q2 in coupling_graph) + 1
 
     # Clamp number of ancillary qubits to be within valid range
     if (
@@ -167,7 +152,7 @@ def subarchitecture_mapping(
         mapping_time_start = time.perf_counter()
 
     # Perform layout synthesis for each sub-architecture
-    state = MappingState(solutions=list(), opt_val=None if end is None else end)
+    state = MappingState(solutions=list(), opt_val=None)
     for i, subarch in enumerate(sb.maximal_subarchitectures):
 
         if verbose > 0:
@@ -195,34 +180,29 @@ def subarchitecture_mapping(
         
         # Perform layout synthesis
         solve_time_start = time.perf_counter()
-        synthesis_result = layout_synthesis_method(
-            circuit_in,
-            circuit_out,
-            platform="custom",
-            bidirectional=1,
+        synthesis_result = layout_synthesis_wrapper(
+            circuit=input_circuit,
+            coupling_graph=edge_list,
             model=model,
             allow_ancillas=True,
-            relaxed=relaxed,
-            cnot_cancel=cnot_cancel,
-            bridge=bridge,
-            solver_time=(solver_time - (time.perf_counter() - solve_time_start)),
+            relaxed_dependencies=bool(relaxed_dependencies),
+            cancel_cnots=bool(cancel_cnots),
+            allow_bridges=bool(allow_bridges),
+            timeout=int(timeout - (time.perf_counter() - solve_time_start)),
             solver=solver,
-            cardinality=cardinality,
-            start=start,
-            step=1,
-            end=bound,
-            parallel_swaps=parallel_swaps,
-            aux_files=aux_files,
-            check=check,
+            swap_upper_bound=swap_upper_bound,
+            parallel_swaps=bool(parallel_swaps),
+            intermediate_files_path=intermediate_files_path,
             verbose=verbose,
             metric=metric,
-            coupling_graph=edge_list,
+            search_strategy=search_strategy,
+            initial_mapping=None
         )
         # circuit, opt_val = (
         #    synthesis_result if synthesis_result is not None else (None, None)
         # )
         circuit = synthesis_result.circuit if synthesis_result else None
-        opt_val = synthesis_result.opt_val if synthesis_result else None
+        opt_val = get_opt_val_from_metric(circuit, metric) if circuit else None
         solve_time = time.perf_counter() - solve_time_start
 
         # Check if mapping was successful
@@ -294,16 +274,10 @@ def subarchitecture_mapping(
         print("Final circuit mapped onto full architecture:")
         print(mapped_circuit)
 
-    # Perform testing of final circuit
-    if check:
-        # TODO: Implement testing
-        pass
-
     mapped_result = MappingResult(
         circuit=mapped_circuit,
         initial_mapping=initial_mapping,
         final_mapping=final_mapping,
-        opt_val=state.opt_val,
     )
     # Return the final circuit
     return mapped_result

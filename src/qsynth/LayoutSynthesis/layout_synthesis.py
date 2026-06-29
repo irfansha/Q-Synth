@@ -3,7 +3,6 @@
 import datetime
 import time
 import os
-from pathlib import Path
 
 from typing import Optional
 
@@ -54,7 +53,7 @@ def layout_synthesis(
     coupling_graph=None,
     initial_mapping: Optional[dict[int, int]] = None,
     search_strategy: str = "forward",
-) -> Optional[tuple[QuantumCircuit, int]]:
+) -> MappingResult:
     # TODO: add descriptions of arguments:
     # --------------------------------------- Creating args separately ---------------------------------------
     args = op()
@@ -82,11 +81,8 @@ def layout_synthesis(
     args.search_strategy = search_strategy
     # ----------------------------------------------------------------------------------------------------
 
-    layout_synthesis_path = os.path.abspath(__file__)
-    QSynth_path = Path(layout_synthesis_path).parent.parent.parent.parent
-    args.domains = os.path.join(
-        QSynth_path, "src", "qsynth", "LayoutSynthesis", "Domains"
-    )
+    source_location = os.path.dirname(os.path.abspath(__file__))
+    args.domains = os.path.join(source_location, "Domains")
 
     # If initial mapping is specified, Only use SAT encoding (without bridges and ancillas):
     if args.initial_mapping is not None:
@@ -230,17 +226,10 @@ def layout_synthesis(
     if args.verbose > 0:
         print("Finish time: " + str(datetime.datetime.now()))
 
-    # Get swap count
-    swap_count = 0
-    ops = mapped_circuit.count_ops()
-    if "swap" in ops.keys():
-        swap_count = ops["swap"]
-
     mapped_result = MappingResult(
         circuit=mapped_circuit,
         initial_mapping=map_extract.map_unmap.initial_mapping,
         final_mapping=map_extract.map_unmap.logical_physical_map,
-        opt_val=swap_count,
     )
 
     # Return mapped result

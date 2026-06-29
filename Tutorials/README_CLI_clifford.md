@@ -36,7 +36,7 @@ Note: We do not guarantee Optimal CNOT-count or CNOT-depth when Peephole optimiz
 
 ## Installation
 
-For detailed instructions on installation, see the [Installation Instructions](INSTALL.md).
+For detailed instructions on installation, see the [Installation Instructions](INSTALL_CLI.md).
 
 ## Usage
 
@@ -56,8 +56,8 @@ The solution is translated back to reconstruct the corresponding CNOT-Optimal Cl
 ### Optimization metric:
 
     --minimize                       Minimization metric for CNOT-Optimal Clifford synthesis:
-                                       gates = minimizing number of CNOT gates (default)
-                                       depth = CNOT-depth minimization
+                                       cx-count = minimizing number of CNOT gates (default)
+                                       cx-depth = CNOT-depth minimization
 
 ### Search space reduction:
 
@@ -123,6 +123,12 @@ We can now resynthesize the circuit while taking layout restrictions (using opti
 The total CNOT depth from 79 is further reduced to 56.
 One can also optimize the CNOT count while being layout aware similarly.
 
+## Example using Planning model:
+
+Instead of SAT, we can use classical planning for CNOT-count optimization (requires FastDownward installed):
+
+    ./q-synth.py clifford --model planning -s fd-ms --minimize cx-count -v 1 Benchmarks/Examples/sat25.qasm
+
 ## Run Experiments:
 
 Use the following bash scripts for running the SAT-2025 experiments:
@@ -133,6 +139,15 @@ Use the following bash scripts for running the SAT-2025 experiments:
     bash run_experiment3.sh
 
 
+Use the following Python scripts for running the ICAPS-2026 planning experiments
+(see `Scripts/ICAPS-26-CliffordSynthesis/README.md` for the required planners and how to install them):
+
+    cd Scripts/ICAPS-26-CliffordSynthesis
+    python run_experiment1.py
+    python run_experiment2a.py
+    python run_experiment2b.py
+    python run_experiment3.py
+
 ## Copyright
 
-(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024, 2025
+(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024, 2025, 2026.

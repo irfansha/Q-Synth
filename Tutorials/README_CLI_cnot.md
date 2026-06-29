@@ -33,7 +33,7 @@ Note: W+R combination is not available for non-CNOT circuits via peephole optimi
 
 ## Installation
 
-For detailed instructions on installation, see the [Installation Instructions](INSTALL.md).
+For detailed instructions on installation, see the [Installation Instructions](INSTALL_CLI.md).
 
 ## Usage
 
@@ -61,8 +61,8 @@ The solution is translated back to reconstruct the corresponding optimal CNOT su
 ### Optimization metric:
 
     --minimize            Minimization metric for CNOT synthesis:
-                            gates = minimizing number of gates (default)
-                            depth = depth minimization (only for qbf and sat solvers)
+                            cx-count = minimizing number of CNOT gates (default)
+                            cx-depth = CNOT-depth minimization (only for qbf and sat solvers)
 
 ### Other options:
     -t, --time            Solving time limit for each CNOT slicein seconds: 600 (d)
@@ -131,10 +131,16 @@ First we map it to some platform of our choice (`-p tenerife`) using layout synt
 
     ./q-synth.py layout -m sat -s cd -p tenerife -v 1 Benchmarks/Examples/ecai24.qasm ecai24_mapped.qasm
 
-Let us (re)synthesize above mapped CNOT circuit with 6 CNOTs while being layout aware.
-Use the following command enabling both qubit permutation (flag `-q`) and platform option (`-p tenerife`):
+In peephole mode (the `cnot` command), qubit permutation together with layout restrictions is not supported.
+Instead, W+R can be applied directly to a single CNOT slice via the API call `cnot_synthesis`, enabling qubit permutation with `output_qubit_permute=True`:
 
-    ./q-synth.py cnot -m sat -s cd --minimize cx-count -p tenerife -q -v 1 ecai24_mapped.qasm
+    from qsynth import get_coupling_graph, cnot_synthesis
+    from qiskit import QuantumCircuit
+
+    coupling_graph = get_coupling_graph("tenerife")
+    circuit = QuantumCircuit.from_qasm_file("ecai24_mapped.qasm")
+    result = cnot_synthesis(circuit=circuit, coupling_graph=coupling_graph,
+                            output_qubit_permute=True, metric="cx-count", verbose=1)
 
 The optimized circuit now has 2 CNOTs instead of 6 while respecting the connectivity restrictions.
 
@@ -155,4 +161,4 @@ Use the following bash scripts for running the ECAI-2024 experiments:
 
 ## Copyright
 
-(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024, 2025
+(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024, 2025, 2026.

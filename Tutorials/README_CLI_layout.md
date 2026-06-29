@@ -13,7 +13,7 @@ We employ two main approaches, classical planning (v1.0) and SAT-solver based pa
 
 ## Installation:
 
-For detailed instructions on installation, see the [Installation Instructions](INSTALL.md).
+For detailed instructions on installation, see the [Installation Instructions](INSTALL_CLI.md).
 
 ## Usage
 
@@ -31,8 +31,8 @@ Q-Synth works by transforming a circuit + platform to a classical planning probl
     -a, --ancillas        Max nr of ancilla qubits: -1=unlimited (d), 0=none, 1,2,... specify max (*)
     -r, --relaxed         Relaxed or Strict Dependencies: 0=strict (d), 1=relaxed
     --bridge              Use bridges [0/1]. For now only supported with -r0, -a0 and -m sat
-    --metric              Optimization metric: one of
-                            cx-depth, cx-count, depth, cx-depth_cx-count, depth_cx-count
+    --metric              Primary optimization metric: cx-count (d), cx-depth, depth
+    --secondary_metric    Optional secondary metric, bounded by the primary: cx-count, cx-depth
     --subarch             Use "subarchitectures" with exact number of ancillas: 0=no (d), 1=yes
 
     -t, --time            Solving time limit in seconds: 1800 (d)
@@ -53,11 +53,6 @@ Q-Synth works by transforming a circuit + platform to a classical planning probl
 
     -m, --model           Model type used for the encoding: -m sat (d)
     -s, --solver          SAT solvers with --model=sat: cd19 (d), g42, cms, etc (1)
-    --cardinality         At-Most and At-Least constraints from PySAT: 
-                            0 = pairwise, 1 = seqcounter (d), 3 = sortnetwrk, etc (2)
-    --start               Solve the sat instances, starting from this depth, 0 (d) (*)
-    --step                Solve the sat instances, at depths modulo this step, 1 (d) (*)
-    --end                 Solve sat instances until this depth (inclusive) when specified, None (d) (*)
 
 ### Experimental Options :
 
@@ -67,7 +62,6 @@ Q-Synth works by transforming a circuit + platform to a classical planning probl
 (d) default option  
 (*) changing these options might lead to suboptimal results  
 (1) See for all supported SAT solvers: [PySat solvers](https://pysathq.github.io/docs/html/api/solvers.html#pysat.solvers.SolverNames)  
-(2) See for all cardinality constraints: [PySat cardinality](https://pysathq.github.io/docs/html/api/card.html#pysat.card.EncType)
 
 ### Debug option
 
@@ -144,15 +138,15 @@ This yields a circuit with cx-depth 10.
 
 One can also optimize for `depth` first, and then `cx-count`:
 
-    ./q-synth.py layout -m sat -p tenerife -s cd19 -v1 Benchmarks/SAT-24/Standard/adder.qasm --metric depth_cx-count
+    ./q-synth.py layout -m sat -p tenerife -s cd19 -v1 Benchmarks/SAT-24/Standard/adder.qasm --metric depth --secondary_metric cx-count
     
 Which results in a mapped circuit with depth 15 and 1 swap.
 
 It is also possible to combine depth-optimal synthesis with sub-architectures :
 
-    ./q-synth.py layout -m sat -p sycamore -s cd19 -v1 Benchmarks/SAT-24/Standard/4gt13_92.qasm --metric depth_cx-count --subarch 1 -a 2
+    ./q-synth.py layout -m sat -p sycamore -s cd19 -v1 Benchmarks/SAT-24/Standard/4gt13_92.qasm --metric depth --secondary_metric cx-count --subarch 1 -a 2
 
-This will compute the optimal mapping of 5-qubit circuit `4gt13_92` with respect to `depth_cx-count` metric on _7-qubit sub-architectures_ of the 53-qubit sycamore architecture.
+This will compute the optimal mapping of 5-qubit circuit `4gt13_92` with respect to `depth` then `cx-count` metric on _7-qubit sub-architectures_ of the 53-qubit sycamore architecture.
 
 ## Run Experiments:
 
@@ -172,4 +166,4 @@ Use the following bash scripts for running the SAT-2024 experiments with SAT-bas
 
 ## Copyright
 
-(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024, 2025
+(C) CC-BY Irfansha Shaik, Jaco van de Pol, Aarhus University, 2023, 2024, 2025, 2026.

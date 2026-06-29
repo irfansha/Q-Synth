@@ -1,8 +1,9 @@
 # Irfansha Shaik, Aarhus, 15 January 2024.
 
 from qiskit import QuantumCircuit
+from qiskit.circuit import Gate
 from qsynth.LayoutSynthesis.circuit_utils import gate_get_qubit
-
+from typing import Callable, Any
 
 # Print the actions from the plan
 def extract_circuit(plan, t, options, num_qubits):
@@ -18,7 +19,7 @@ def extract_circuit(plan, t, options, num_qubits):
             assert options.encoding == "gate_weighted"
             continue
         qubit1 = int(cur_action[1][1:])
-        if cur_action[0] == "cnot":
+        if cur_action[0] == "cnot" or cur_action[0] == "cnot-flipped":
             qubit2 = int(cur_action[2][1:])
             opt_circuit.cx(qubit1, qubit2)
         elif cur_action[0] == "s-gate" or cur_action[0] == "s-gate-last":
@@ -31,10 +32,12 @@ def extract_circuit(plan, t, options, num_qubits):
         elif cur_action[0] == "hs-gate" or cur_action[0] == "hs-gate-last":
             opt_circuit.h(qubit1)
             opt_circuit.s(qubit1)
-        elif cur_action[0] == "hsh-gate-last":
-            opt_circuit.h(qubit1)
-            opt_circuit.s(qubit1)
-            opt_circuit.h(qubit1)
+        elif cur_action[0] == "hsh-gate-last" or cur_action[0] == "sx-gate" or cur_action[0] == "sx-gate-last":
+            #opt_circuit.h(qubit1)
+            #opt_circuit.s(qubit1)
+            #opt_circuit.h(qubit1)
+            # HSH = sx-gate, since we do phase recovery:
+            opt_circuit.sx(qubit1)
         elif cur_action[0] == "z-gate":
             opt_circuit.z(qubit1)
         elif cur_action[0] == "y-gate":
@@ -160,6 +163,44 @@ def compute_cnotdepth_swaps_as_3cx(circuit, check=0, verbose=0):
     swap_free_circuit = replace_swaps_with_3cx(circuit, check, verbose)
     return compute_cnot_depth(swap_free_circuit)
 
+def compute_oneq_gate_count(circuit: QuantumCircuit) -> int:
+    # Count only 1q gates
+    one_q_gate_count = circuit.size(
+        lambda instr: isinstance(instr.operation, Gate)
+        and instr.operation.num_qubits == 1
+    )
+    return one_q_gate_count
+
+def compute_pauli_gate_count(circuit: QuantumCircuit) -> int:
+    phase_gate_count = 0
+    for inst in circuit.data:
+        if inst[0].name in ['x', 'y', 'z']:
+            phase_gate_count += 1
+    return phase_gate_count
+
+def compare(obj1: Any, obj2: Any, metric_funcs: list[Callable[[Any], int]]) -> int:
+    """
+    Compare two objects based on given metric functions (lower is better).
+    
+    Args:
+        obj1, obj2: The objects to compare (e.g., QuantumCircuit instances).
+        metric_funcs: List of callable metrics, each taking an object and returning an int.
+    
+    Returns:
+        -1 if obj1 is better than obj2,
+        1 if obj2 is better than obj1,
+        0 if equal on all metrics.
+    """
+
+    vals1 = [f(obj1) for f in metric_funcs]
+    vals2 = [f(obj2) for f in metric_funcs]
+    
+    for v1, v2 in zip(vals1, vals2):
+        if v1 < v2:
+            return -1  # obj1 better
+        if v1 > v2:
+            return 1   # obj2 better
+    return 0  # equal
 
 def compute_and_print_costs(
     org_circuit, opt_circuit, cnot_minimization=None, verbose=0

@@ -66,9 +66,11 @@ class ExtractPlan:
                 self.plan.append(("h-gate", "q" + str(qid)))
             else:
                 assert hph_last in self.sol_map and self.sol_map[hph_last]
-                self.plan.append(("h-gate", "q" + str(qid)))
-                self.plan.append(("s-gate", "q" + str(qid)))
-                self.plan.append(("h-gate", "q" + str(qid)))
+                #self.plan.append(("h-gate", "q" + str(qid)))
+                #self.plan.append(("s-gate", "q" + str(qid)))
+                #self.plan.append(("h-gate", "q" + str(qid)))
+                # HSH = sx-gate, since we do phase recovery:
+                self.plan.append(("sx-gate", "q" + str(qid)))
 
     def __init__(self, options, solver):
         self.options = options

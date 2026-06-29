@@ -632,8 +632,7 @@ def platform(platform, bidirectional, coupling_graph, verbose=0):
         num_physical_qubits = max(itertools.chain.from_iterable(coupling_graph)) + 1
         coupling_map = coupling_graph
     else:
-        print(f"Platform {platform} is not recognized")
-        exit(-1)
+        raise ValueError(f"Unknown platform: {platform}")
     if verbose > 0:
         print(f"platform generated: {platform}")
         print("number of physical qubits: ", num_physical_qubits)

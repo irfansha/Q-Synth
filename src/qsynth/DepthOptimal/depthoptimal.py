@@ -145,7 +145,7 @@ def depth_optimal_mapping(
     swap_bound=None,
     depth_bound=None,
     check=False,
-) -> Optional[tuple[QuantumCircuit, int]]:
+) -> MappingResult:
 
     # Parse inputs
     try:
@@ -356,7 +356,6 @@ def depth_optimal_mapping(
             output_mapping = {k.id: v.id for k, v in output_mapping.items()}
             mapped_result = MappingResult(
                 circuit=output.circuit,
-                opt_val=opt_val,
                 initial_mapping=initial_mapping,
                 final_mapping=output_mapping,
             )
@@ -365,7 +364,7 @@ def depth_optimal_mapping(
         case SynthesizerNoSolution():
             if verbose > -1:
                 print("No mapping found.")
-            return None
+            return MappingResult(circuit=circuit_in, no_plan_found=True)
         case _:
             print("Error: synthesizer solution not recognized.")
             exit(-1)

@@ -4,185 +4,156 @@ import time
 from typing import Optional
 from qiskit import QuantumCircuit
 
+from qsynth.Utilities.coupling_graph import CouplingGraph
+from qsynth.Utilities.result import MappingResult
+from qsynth.layout_config import DEPTH_OPTIMAL_METRICS
 
-def layout_synthesis(
-    circuit_in,
-    circuit_out=None,
-    platform=None,
-    model="sat",
-    solver=None,
-    solver_time=1800,
-    allow_ancillas=True,
-    relaxed=0,
-    bidirectional=1,
-    bridge=0,
-    start=None,
-    step=1,
-    end=None,
-    check=0,
-    verbose=1,
-    cnot_cancel=0,
-    cardinality=1,
-    parallel_swaps=0,
-    aux_files="./intermediate_files",
-    metric="cx-count",
-    coupling_graph=None,
-    initial_mapping: Optional[dict[int, int]] = None,
-    search_strategy: str = "forward",
-) -> Optional[tuple[QuantumCircuit, int]]:
 
-    # Resolve default planner when needed
-    if model == "planning":
-        match metric:
-            case "cx-count":
-                model = "local"
-            case "cx-depth" | "depth" | "depth_cx-count" | "cx-depth_cx-count":
-                model = "cond_cost_opt"
-
-    # Select default compatible solver unless specified by user
-    if solver is None:
-        match model:
-            case "sat":
-                solver = "cd19"
-            case "global" | "local" | "lifted" | "cost_opt" | "lc_incr":
-                solver = "fd-bjolp"
-            case "cond_cost_opt":
-                solver = "fd-ms"
-            case _:
-                # NOTE: Removed early-termination here
-                pass
-
-    # Perform error-checking for incompatible options
-    try:
-        check_options(model, solver, metric)
-    except ValueError as e:
-        print(f"Error: {e}")
-        return None
-
-    # If initial mapping is specified, only use CNOT count optimization:
-    if initial_mapping is not None:
-        if metric != "cx-count":
-            print(
-                "Warning: Initial mapping is specified, but metric is not 'cx-count'. "
-                "Using 'cx-count' metric for layout synthesis."
-            )
-        metric = "cx-count"
-    # If search strategy is backwards, we only do CNOT count optimization:
-    if search_strategy == "backwards":
-        if metric != "cx-count":
-            print(
-                "Warning: Search strategy is 'backwards', but metric is not 'cx-count'. "
-                "Using 'cx-count' metric for layout synthesis."
-            )
-        metric = "cx-count"
+def layout_synthesis_wrapper(
+    circuit: QuantumCircuit,
+    coupling_graph: CouplingGraph,
+    metric: str,
+    parallel_swaps: bool,
+    allow_ancillas: bool,
+    search_strategy: str,
+    swap_upper_bound: Optional[int],
+    initial_mapping: Optional[dict[int, int]],
+    relaxed_dependencies: bool,
+    cancel_cnots: bool,
+    allow_bridges: bool,
+    model: str,
+    solver: Optional[str],
+    intermediate_files_path: str,
+    timeout: int,
+    verbose: int,
+) -> MappingResult:
 
     # Call the right layout synthesis tool based on optimisation metric
-    # TODO: Replace this match-case with if-statement using layout-config.py
-    match metric:
+    if metric == "cx-count":
+        from qsynth.LayoutSynthesis.layout_synthesis import (
+            layout_synthesis as ls,
+        )
+        from qsynth.ReachabilitySolver.encodings.layout_synthesis.layout_reachability_synthesis import (
+            layout_synthesis_using_reachability
+        )
 
-        case "cx-count":
-            from qsynth.LayoutSynthesis.layout_synthesis import (
-                layout_synthesis as ls,
-            )
-
-            # Call std. layout synthesis
-            return ls(
-                circuit_in=circuit_in,
-                circuit_out=circuit_out,
-                platform=platform,
-                model=model,
-                solver=solver,
-                solver_time=solver_time,
-                allow_ancillas=allow_ancillas,
-                relaxed=relaxed,
-                bidirectional=bidirectional,
-                bridge=bridge,
-                start=start,
-                step=step,
-                end=end,
-                verbose=verbose,
-                cnot_cancel=cnot_cancel,
-                cardinality=cardinality,
-                parallel_swaps=parallel_swaps,
-                aux_files=aux_files,
-                check=check,
+        is_reachability_strategy = search_strategy not in ["forward", "backward", "unbounded-forward"]
+        options_implemented_for_reachability = (not allow_bridges and not relaxed_dependencies and model == "sat"
+                and not initial_mapping and not parallel_swaps)
+        if options_implemented_for_reachability and is_reachability_strategy:
+            return layout_synthesis_using_reachability(
+                circuit=circuit,
+                upper_bound=swap_upper_bound,
+                platform=None,
                 coupling_graph=coupling_graph,
-                initial_mapping=initial_mapping,
-                search_strategy=search_strategy,
-            )
-
-        case "cx-depth" | "depth" | "depth_cx-count" | "cx-depth_cx-count":
-            from qsynth.DepthOptimal.depthoptimal import depth_optimal_mapping
-
-            # TODO:
-            # Add error-messages and checking for all options not supported
-            # by depth-optimal mapping.
-            # For example:
-            # bidirectional!=1, relaxed, bridge, cardinality, etc.
-
-            return depth_optimal_mapping(
-                circuit_in=circuit_in,
-                circuit_out=circuit_out,
-                output_initial=None,
-                platform_name=platform,
-                coupling_graph=coupling_graph,
-                model=model,
-                solver_name=solver,
-                solver_time=solver_time,
-                cx_optimal=(metric in ("cx-depth", "cx-depth_cx-count")),
-                swap_optimal=(metric in ("depth_cx-count", "cx-depth_cx-count")),
+                strategy=search_strategy,
                 allow_ancillas=allow_ancillas,
-                verbose=verbose,
-                swap_bound=None,  # Do not use swap-bound in favor of depth-bound
-                depth_bound=end,
+                intermediate_files_path=intermediate_files_path,
+                timeout=timeout
             )
-        case "cx-count_cx-depth":
-            from qsynth.LayoutSynthesis.layout_synthesis import (
-                layout_synthesis as count_optimal_mapping,
-            )
-            from qsynth.CliffordSynthesis.circuit_utils import (
-                compute_cnotdepth_swaps_as_3cx,
-            )
-            from qsynth.DepthOptimal.depthoptimal import depth_optimal_mapping
-            # First perform CNOT count optimal mapping
-            if verbose >= 0:
-                print("Starting cx-count optimal layout synthesis...")
-            # Only setting options through API:
-            start_time = time.time()
-            intermediate_result = count_optimal_mapping(
-                                    circuit_in=circuit_in,
-                                    circuit_out=circuit_out,
-                                    coupling_graph=coupling_graph,
-                                    parallel_swaps=parallel_swaps,
-                                    solver_time=solver_time,
-                                    verbose=verbose,
-                                    allow_ancillas=allow_ancillas,
-                                    )
-            end_time = time.time()
-            swap_count = intermediate_result.circuit.count_ops().get("swap", 0)
-            cx_depth = compute_cnotdepth_swaps_as_3cx(intermediate_result.circuit)
-            remaining_time = solver_time - (end_time - start_time)
-            if verbose >= 0:
-                print(f"Starting cx-depth optimal layout synthesis...")
-            # Then perform cx-depth optimal mapping using the swap count as bound
-            return depth_optimal_mapping(
-                circuit_in=circuit_in,
-                circuit_out=circuit_out,
-                output_initial=None,
-                coupling_graph=coupling_graph,
-                model=model,
-                solver_name=solver,
-                solver_time=remaining_time,
-                cx_optimal=True,
-                swap_optimal=False,
-                allow_ancillas=allow_ancillas,
-                verbose=verbose,
-                swap_bound=swap_count,
-                depth_bound=cx_depth,
-            )
-        case _:
-            print("Error: Please specify an optimisation metric")
-            return None
+
+        # Call std. layout synthesis
+        if search_strategy == "forward":
+            start = 0
+            end = swap_upper_bound
+        else:
+            start = swap_upper_bound
+            end = 0
+        return ls(
+            circuit_in=circuit,
+            circuit_out=None,
+            platform=None,
+            model=model,
+            solver=solver,
+            solver_time=timeout,
+            allow_ancillas=allow_ancillas,
+            relaxed=relaxed_dependencies,
+            bidirectional=1, # TODO: Reintroduce bidirectional parameter if bidirectional=2 is important
+            bridge=allow_bridges,
+            start=start,
+            step=1,
+            end=end,
+            verbose=verbose,
+            cnot_cancel=cancel_cnots,
+            parallel_swaps=parallel_swaps,
+            aux_files=intermediate_files_path,
+            check=0,
+            coupling_graph=coupling_graph,
+            initial_mapping=initial_mapping,
+            search_strategy=search_strategy,
+        )
+
+    elif metric in DEPTH_OPTIMAL_METRICS:
+        from qsynth.DepthOptimal.depthoptimal import depth_optimal_mapping
+
+        # TODO:
+        # Add error-messages and checking for all options not supported
+        # by depth-optimal mapping.
+        # For example:
+        # bidirectional!=1, relaxed, bridge, cardinality, etc.
+
+        return depth_optimal_mapping(
+            circuit_in=circuit,
+            circuit_out=None,
+            output_initial=None,
+            platform_name=None,
+            coupling_graph=coupling_graph,
+            model=model,
+            solver_name=solver,
+            solver_time=timeout,
+            cx_optimal=(metric in ("cx-depth", "cx-depth_cx-count")),
+            swap_optimal=(metric in ("depth_cx-count", "cx-depth_cx-count")),
+            allow_ancillas=allow_ancillas,
+            verbose=verbose,
+            swap_bound=None,  # Do not use swap-bound in favor of depth-bound
+            depth_bound=None,
+        )
+    elif metric == "cx-count_cx-depth":
+        from qsynth.LayoutSynthesis.layout_synthesis import (
+            layout_synthesis as count_optimal_mapping,
+        )
+        from qsynth.CliffordSynthesis.circuit_utils import (
+            compute_cnotdepth_swaps_as_3cx,
+        )
+        from qsynth.DepthOptimal.depthoptimal import depth_optimal_mapping
+        # First perform CNOT count optimal mapping
+        if verbose >= 0:
+            print("Starting cx-count optimal layout synthesis...")
+        # Only setting options through API:
+        start_time = time.time()
+        intermediate_result = count_optimal_mapping(
+                                circuit_in=circuit,
+                                circuit_out=None,
+                                coupling_graph=coupling_graph,
+                                parallel_swaps=parallel_swaps,
+                                solver_time=timeout,
+                                verbose=verbose,
+                                allow_ancillas=allow_ancillas,
+                                )
+        end_time = time.time()
+        swap_count = intermediate_result.circuit.count_ops().get("swap", 0)
+        cx_depth = compute_cnotdepth_swaps_as_3cx(intermediate_result.circuit)
+        remaining_time = timeout - (end_time - start_time)
+        if verbose >= 0:
+            print(f"Starting cx-depth optimal layout synthesis...")
+        # Then perform cx-depth optimal mapping using the swap count as bound
+        return depth_optimal_mapping(
+            circuit_in=circuit,
+            circuit_out=None,
+            output_initial=None,
+            coupling_graph=coupling_graph,
+            model=model,
+            solver_name=solver,
+            solver_time=remaining_time,
+            cx_optimal=True,
+            swap_optimal=False,
+            allow_ancillas=allow_ancillas,
+            verbose=verbose,
+            swap_bound=swap_count,
+            depth_bound=cx_depth,
+        )
+    else:
+        raise ValueError(f"Unknown metric: {metric}")
 
 
 def check_options(model: str, solver: str, metric: str):
@@ -206,13 +177,13 @@ def check_options(model: str, solver: str, metric: str):
     if metric in DEPTH_OPTIMAL_METRICS and model not in DEPTH_OPTIMAL_MODELS:
         raise ValueError(
             f"Model '{model}' is not supported for depth-metric '{metric}'.\n"
-            f" Please use different --metric or a --model in {DEPTH_OPTIMAL_MODELS}"
+            f" Please use different metric or a model in {DEPTH_OPTIMAL_MODELS}"
         )
 
     if metric in SWAP_OPTIMAL_METRICS and model not in SWAP_OPTIMAL_MODELS:
         raise ValueError(
             f"Model '{model}' is not supported for count-metric '{metric}'.\n"
-            f" Please use different --metric or a --model in {SWAP_OPTIMAL_MODELS}"
+            f" Please use different metric or a model in {SWAP_OPTIMAL_MODELS}"
         )
 
     # Check compatibility of metric and solver
@@ -233,7 +204,7 @@ def check_options(model: str, solver: str, metric: str):
         raise ValueError(
             f"Solver '{solver}' is not supported for planning model '{model}'.\n"
             f" Please use one of the following solvers: {PLANNING_SOLVERS}"
-            "(the valid planners also depend on the --metric)"
+            "(the valid planners also depend on the choice of metric)"
         )
 
     if model in SAT_MODELS and solver not in SAT_SOLVERS:

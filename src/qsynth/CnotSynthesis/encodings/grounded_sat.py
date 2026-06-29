@@ -17,6 +17,7 @@ class GroundedSat:
 
     # Generates quanifier blocks:
     def generate_quantifier_blocks(self):
+        #print(f"{str(self.encoding_variables.next_var - 1)} variables and {len(self.clause_list)} clauses")
         # Header:
         self.quantifier_block.append(
             "p cnf "
@@ -480,6 +481,7 @@ class GroundedSat:
         all_cnotvars = []
         for time_step in range(self.options.plan_length):
             all_cnotvars.extend(self.cnot_variables[time_step])
+        #print(f"AtMost({self.options.local_cxcount_bound}) on {len(all_cnotvars)} CNOT variables")
 
         # we add atmost k constraints for all cnot vars:
         self.atmostk_constraints(all_cnotvars, self.options.local_cxcount_bound)

@@ -190,7 +190,6 @@ def clifford_optimization(
     qubit_permute=False,
     intermediate_files_path="intermediate_files",
     check=0,
-    report_timeout=False,
     cardinality=1,
 ):
     # if coupling graph is not None, we set platform to custom:
@@ -350,19 +349,14 @@ def clifford_optimization(
     if options.verbose > 0:
         print(f"Time taken: {total_time}")
     # if opt circuit in not None, then we compute costs and check equivalence:
-    if opt_circuit != None:
-        if options.verbose > 1:
-            print(opt_circuit)
-        if options.check:
-            equivalence_check(circuit, opt_circuit, None, options)
+    if opt_circuit is None:
+        return MappingResult(circuit=circuit, no_plan_found=True)
+    if options.verbose > 1:
+        print(opt_circuit)
+    if options.check:
+        equivalence_check(circuit, opt_circuit, None, options)
     # We do not have initial permutation, So one-to-one mapping is applied:
-    initial_mapping = {i: i for i in range(num_qubits)}
-    if report_timeout:
-        result = MappingResult(
-            circuit=opt_circuit, timed_out=timed_out, initial_mapping=initial_mapping
-        )
-    else:
-        result = MappingResult(circuit=opt_circuit, initial_mapping=initial_mapping)
+    result = MappingResult(circuit=opt_circuit, timed_out=timed_out)
     return result
 
 
