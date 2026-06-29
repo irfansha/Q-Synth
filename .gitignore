@@ -152,7 +152,6 @@ intermediate_files/
 *.DS_Store
 
 QSynth-venv/*
-*.qasm
 *.patch
 
 .idea
